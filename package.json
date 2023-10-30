@@ -1,0 +1,23 @@
+{
+  "name": "flexy",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/flexy.js",
+      "require": "./dist/flexy.umd.cjs"
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "eslint": "8.34.0",
+    "three": "0.146.0",
+    "vite": "4.4.5"
+  }
+}
