@@ -10,16 +10,12 @@ export default defineConfig({
         target: 'esnext',
         lib: {
             entry: 'src/index.js',
-            name: 'four20',
+            name: 'flexy',
             formats: [
                 'es',
                 'umd',
                 'cjs'
             ]
-        },
-        rollupOptions: {
-            // Exclude HTML files from the build
-            external: ['*.html']
         }
     }
 });
