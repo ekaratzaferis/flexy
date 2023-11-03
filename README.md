@@ -19,21 +19,28 @@ or from a CDN
 
 ```js
 import * as flexy from 'flexy';
+import * as THREE from 'three';
 
 const R = 3;
-
 const startPoint = new Vector3(R, 0, 0);
 const controlPoint1 = new Vector3(R, R * 0.55, 0);
 const controlPoint2 = new Vector3(R * 0.45, R, 0);
 const endPoint = new Vector3(0, R, 0);
 
+// This is a cubic bezier curve. The direction that we're "drawing" the curve, affects the final outcome.
+// In this case we're drawing from x = R -> x = 0
+// So the point of our geometry with the smallest x coordinate will end up on the x = R position.
+// That will make the modified geometry appear as it was also rotated.
 const curve = new CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
 
+// Indicates the orientation of the hypothetical plane that the curve could "rest" upon. For example, a curve in the x-y plane, could be rest flat upon the (0, 0, 1) or (0, 0, -1) plane.
+// This is usefull to the modifier because it can consistently calculate the tangent lines for each point in the curve, therefore bend every point of the geometry to the correct position.
+const orientation = new new THREE.Vector3(0, 0, 1);
+
 flexy.bend({
-    THREE, // instance of your app
-    curve, // a bezier curve
-    quaternion: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(), 0), // indicates the global orientation of the curve. for 2D designs you could use that quanternion
-    // orientation: new new THREE.Vector3(), instead of the quanternion, directly provide the needed vector
+    THREE,
+    curve,
+    orientation,
     bufferGeometry: mesh.geometry,
     axis: 'x'
 });
