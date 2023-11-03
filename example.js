@@ -250,14 +250,14 @@ const settings = {
     box: {
         width: 15,
         height: 2,
-        depth: 15,
+        depth: 2,
         widthSegments: 60,
         heightSegments: 10,
         depthSegments: 10,
         wireframe: false
     },
     firstCurve: {
-        type: 'arc',
+        type: '3d_arc',
         rotation: 0,
         arcR: 10,
         ellipseA: 15,
