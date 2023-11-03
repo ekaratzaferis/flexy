@@ -12,44 +12,60 @@ npm install flexy
 or from a CDN
 
 ```
-https:link_to_cdn
+<script src="http://"></script>
 ```
 
 # How to use it
 
-After you import flexy to your project, you first have to generate a Cubic Bezier Curve.
+```js
+import * as flexy from 'flexy';
 
-eg
+const R = 3;
 
-```
 const startPoint = new Vector3(R, 0, 0);
 const controlPoint1 = new Vector3(R, R * 0.55, 0);
 const controlPoint2 = new Vector3(R * 0.45, R, 0);
 const endPoint = new Vector3(0, R, 0);
+
 const curve = new CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
-```
 
-then in order to bend it in the 'y' axis
-
-```
-flexy.bend(curve, 1000, yourGeometry, 'y');
+flexy.bend({
+    THREE, // instance of your app
+    curve, // a bezier curve
+    quaternion: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(), 0), // indicates the global orientation of the curve. for 2D designs you could use that quanternion
+    // orientation: new new THREE.Vector3(), instead of the quanternion, directly provide the needed vector
+    bufferGeometry: mesh.geometry,
+    axis: 'x'
+});
 ```
 
 # Behind the scenes
 
-Nice little diagram
+First, we generate a mesh using the THREE.BoxGeometry constructor.
+![plot](./img/geometry.png)
 
-# How to run the examples
+Then we need a curve that our geometry will be placed & streched/bent upon (in our case the X axis).
+![plot](./img/curve.png)
 
-```
-npm i
-npm run dev
-```
+First we have to normalize each x coordinate of the box, to a point at our curve. For example, the far left x coordinates, will be normalize to the point at the start of the curve.
 
-Open your browser @ localhost:5173
+Next, we calculate the tangent for of these normalized coordinates.
+![plot](./img/tangents.png)
 
-# Todos
+And we procceed by calculating vectors that are orthogonal/perpendicular to the tangent vectors (the purple lines).
+![plot](./img/orthogonals.png)
 
-1. Given object A, object B and a normal Vector that indicates a direction, bend object B onto object A
-2. Bend on all 3 axis
-3. Leave better comments
+Now all we have to do, is to rotated them (counter)clockwise in order to match the (0, y, z) angle that the current x coordintate has.
+![plot](./img/rotation1.png)
+
+Here are the resulting normals.
+![plot](./img/rotation2.png)
+
+Finally we need to set the length of each normal, equal to the (0, y, z) length.
+![plot](./img/final%20position.png)
+
+in order to get something like this:
+![plot](./img/bent%20geometry.png)
+
+Here's another screenshot that emphasizes the relationship between the curve and the box after the box.
+![plot](./img/bend%20geometry%20wireframe.png)

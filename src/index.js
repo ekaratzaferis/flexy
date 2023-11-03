@@ -1,33 +1,17 @@
-let Box3;
-let Vector3;
-let THREE;
-
 /**
- * Provide the THREE js module that are needed
- * @param {Object} THREE
- * @param {Constructor} THREE.Box3
- * @param {Constructor} THREE.Vector3
- * @param {Constructor} THREE.CatmullRomCurve3
- */
-function load3(THREE3) {
-    Box3 = THREE3.Box3;
-    Vector3 = THREE3.Vector3;
-    THREE = THREE3;
-}
-
-/**
- * Calculates the bounding box of BufferGeometry.
- * @param {*} bufferGeometry bufferGeometry
+ * Calculates the bounding box of a BufferGeometry.
+ * @param {Library} THREE The imported THREE instance.
+ * @param {BufferGeometry} bufferGeometry bufferGeometry
  * @returns The calculated bounding box
  */
-function calculateBoundingBox(bufferGeometry) {
+function calculateBoundingBox(THREE, bufferGeometry) {
     const positionAttribute = bufferGeometry.getAttribute('position');
-    const boundingBox = new Box3();
+    const boundingBox = new THREE.Box3();
 
-    boundingBox.center = new Vector3();
+    boundingBox.center = new THREE.Vector3();
 
     for (let i = 0; i < positionAttribute.count; i++) {
-        const vertex = new Vector3();
+        const vertex = new THREE.Vector3();
         vertex.fromBufferAttribute(positionAttribute, i);
         boundingBox.expandByPoint(vertex);
 
@@ -35,8 +19,7 @@ function calculateBoundingBox(bufferGeometry) {
         const y = positionAttribute[i + 1];
         const z = positionAttribute[i + 2];
 
-        // Add the vertex position to the center
-        boundingBox.center.add(new Vector3(x, y, z));
+        boundingBox.center.add(new THREE.Vector3(x, y, z));
     }
 
     boundingBox.center.divideScalar(positionAttribute.count / 3);
@@ -46,16 +29,22 @@ function calculateBoundingBox(bufferGeometry) {
 
 /**
  * Bends & positions the given geometry along on a CubicBezierCurve3 curve.
- * @param {CubicBezierCurve3} curve The curve based on which we will curve the geometry
- * @param {bufferGeometry} bufferGeometry The geometry that will be bent
- * @param {String} axis Which axis will be ajusted to the given curve
+ * @param {Object} options The options object
+ * @param {Library} options.THREE The THREE instance from your app.
+ * @param {CubicBezierCurve3} options.curve The curve based on which we will curve the geometry
+ * @param {Quaternion} options.quaternion A quaternion that indicates the overall orientation of the curve
+ * @param {Vector3} [options.orientation] Instead of the orientation, directly provide the exact vector that indicates the orientation
+ * @param {bufferGeometry} options.bufferGeometry The geometry that will be bent
+ * @param {String} options.axis Which axis will be ajusted to the given curve
  */
-const bend = function(curve, bufferGeometry, axis) {
+export const bend = function({
+    THREE, curve, quaternion, orientation, bufferGeometry, axis, scene
+}) {
 
-    const bb = calculateBoundingBox(bufferGeometry);
+    // Bounding boxes of geometry //
+    const geometryBB = calculateBoundingBox(THREE, bufferGeometry);
     const positions = bufferGeometry.attributes.position.array;
 
-    // legacy
     for (let i = 0; i < positions.length; i += 3) {
 
         const x = parseFloat(positions[i]);
@@ -64,51 +53,94 @@ const bend = function(curve, bufferGeometry, axis) {
 
         if (axis === 'x') {
 
-            // Normalize 0..1 the x coordinate //
-            const howFarAlongInTheGeometry = (x - bb.min.x) / (bb.max.x - bb.min.x);
+            // Normalize 0..1 the x coordinate relative to the geometry's length //
+            const howFarAlongInTheGeometry = (x - geometryBB.min.x) / (geometryBB.max.x - geometryBB.min.x);
 
             // In the given curve, get the tanget line at that point //
-            const tangentNormal = curve.getTangentAt(howFarAlongInTheGeometry).normalize();
             const tangentPoint = curve.getPointAt(howFarAlongInTheGeometry);
+            const tangentNormal = curve.getTangentAt(howFarAlongInTheGeometry).normalize();
 
-            // Find normals that are orhogonal to our tangent normal in the y-z axis //
-            let orthogonalY;
-            if (y >= bb.center.y) {
-                orthogonalY = new Vector3(-tangentNormal.y, tangentNormal.x, 0).normalize(); // ok
-                // if (x >= bb.center.x) {
-                // } else {
-                //     orthogonalY = new Vector3(-tangentNormal.y, tangentNormal.x, 0).normalize();
-                // }
-            } else {
-                orthogonalY = new Vector3(tangentNormal.y, -tangentNormal.x, 0).normalize(); // ok
-                // if (x >= bb.center.x) {
-                // } else {
-                //     orthogonalY = new Vector3(tangentNormal.y, -tangentNormal.x, 0).normalize();
-                // }
+            // Find an orthogonal vector to the tangent normal //
+            const referenceNormal = orientation || new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion).normalize().multiplyScalar(1000000);
+            const orthogonal = referenceNormal.clone().cross(tangentNormal.clone()).normalize();
+
+            // We calculate the rotation needed in order to rotate our tangent line in the same angle that our geometry point is rotated //
+            const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(tangentNormal.clone(), Math.atan2(z, y));
+
+            // Apply the above rotation to our orthogonal //
+            orthogonal.applyQuaternion(rotationQuaternion);
+
+            // Set the rotated orthogonal's length equal to the length of the geometry point //
+            const displacement = orthogonal.clone().setLength(new THREE.Vector3(0, y, z).length());
+
+            if (i > 0) {
+                // drawVector(THREE, scene, tangentPoint, tangentPoint.clone().add(tangentNormal), '#fff');
+                // drawVector(THREE, scene, tangentPoint, tangentPoint.clone().add(referenceNormal), y >= geometryBB.center.y ? '#0ff' : '#F0f');
+                // drawVector(THREE, scene, tangentPoint, tangentPoint.clone().add(orthogonal), y >= geometryBB.center.y ? '#0ff' : '#F0f');
+                // drawVector(THREE, scene, tangentPoint, tangentPoint.clone().add(displacement), y >= geometryBB.center.y ? '#0ff' : '#F0f');
             }
 
-            let orthogonalZ;
-            if (z >= bb.center.z) {
-                orthogonalZ = new Vector3(0, -tangentNormal.z, -tangentNormal.x).normalize(); // ok
-            } else {
-                orthogonalZ = new Vector3(0, tangentNormal.z, tangentNormal.x).normalize(); // ok
-            }
+            // Displace the original coordinates //
+            const finalPosition = tangentPoint.clone().add(displacement);
+            positions[i] = finalPosition.x;
+            positions[i + 1] = finalPosition.y;
+            positions[i + 2] = finalPosition.z;
 
-            // Calculate the displacement of the point //
-            const displacementY = orthogonalY.clone().multiplyScalar(Math.abs(y));
-            const displacementZ = orthogonalZ.clone().multiplyScalar(Math.abs(z));
-            const displacement = displacementY.clone().add(displacementZ);
+        } else if (axis === 'z') {
 
-            // if (i > 0) {
-            //     drawVector(scene, tangentPoint, tangentPoint.clone().add(tangentNormal), '#f00');
-            //     drawVector(scene, tangentPoint, tangentPoint.clone().add(orthogonalY), y >= bb.center.y ? '#f0f' : '#0f0');
-            //     drawVector(scene, tangentPoint, tangentPoint.clone().add(orthogonalZ), z >= bb.center.z ? '#fff' : '#00f');
-            // }
+            // Normalize 0..1 the z coordinate relative to the geometry's length //
+            const howFarAlongInTheGeometry = (z - geometryBB.min.z) / (geometryBB.max.z - geometryBB.min.z);
 
-            positions[i] = tangentPoint.x + displacement.x;
-            positions[i + 1] = tangentPoint.y + displacement.y;
-            positions[i + 2] = tangentPoint.z + displacement.z;
+            // In the given curve, get the tanget line at that point //
+            const tangentPoint = curve.getPointAt(howFarAlongInTheGeometry);
+            const tangentNormal = curve.getTangentAt(howFarAlongInTheGeometry).normalize();
 
+            // Find an orthogonal vector to the tangent normal //
+            const referenceNormal = orientation || new THREE.Vector3(1, 0, 0).applyQuaternion(quaternion).normalize().multiplyScalar(1000000);
+            const orthogonal = referenceNormal.clone().cross(tangentNormal.clone()).normalize();
+
+            // We calculate the rotation needed in order to rotate our tangent line in the same angle that our geometry point is rotated //
+            const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(tangentNormal.clone(), Math.atan2(y, x) + Math.PI / 2);
+
+            // Apply the above rotation to our orthogonal //
+            orthogonal.applyQuaternion(rotationQuaternion);
+
+            // Set the rotated orthogonal's length equal to the length of the geometry point //
+            const displacement = orthogonal.clone().setLength(new THREE.Vector3(x, y, 0).length());
+
+            // Displace the original coordinates //
+            const finalPosition = tangentPoint.clone().add(displacement);
+            positions[i] = finalPosition.x;
+            positions[i + 1] = finalPosition.y;
+            positions[i + 2] = finalPosition.z;
+
+        } else if (axis === 'y') {
+
+            // Normalize 0..1 the z coordinate relative to the geometry's length //
+            const howFarAlongInTheGeometry = (y - geometryBB.min.y) / (geometryBB.max.y - geometryBB.min.y);
+
+            // In the given curve, get the tanget line at that point //
+            const tangentPoint = curve.getPointAt(howFarAlongInTheGeometry);
+            const tangentNormal = curve.getTangentAt(howFarAlongInTheGeometry).normalize();
+
+            // Find an orthogonal vector to the tangent normal //
+            const referenceNormal = orientation.normalize().multiplyScalar(1000000) || new THREE.Vector3(0, 1, 0).applyQuaternion(quaternion).normalize().multiplyScalar(1000000);
+            const orthogonal = referenceNormal.clone().cross(tangentNormal.clone()).normalize();
+
+            // We calculate the rotation needed in order to rotate our tangent line in the same angle that our geometry point is rotated //
+            const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(tangentNormal.clone(), Math.atan2(x, z));
+
+            // Apply the above rotation to our orthogonal //
+            orthogonal.applyQuaternion(rotationQuaternion);
+
+            // Set the rotated orthogonal's length equal to the length of the geometry point //
+            const displacement = orthogonal.clone().setLength(new THREE.Vector3(x, 0, z).length());
+
+            // Displace the original coordinates //
+            const finalPosition = tangentPoint.clone().add(displacement);
+            positions[i] = finalPosition.x;
+            positions[i + 1] = finalPosition.y;
+            positions[i + 2] = finalPosition.z;
         }
 
     }
@@ -116,12 +148,7 @@ const bend = function(curve, bufferGeometry, axis) {
     bufferGeometry.attributes.position.needsUpdate = true;
 };
 
-export const flexy = {
-    bend,
-    load3
-};
-
-function drawVector(scene, startPoint = {
+function drawVector(THREE, scene, startPoint = {
     x: 0,
     y: 0,
     z: 0

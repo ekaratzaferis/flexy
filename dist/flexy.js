@@ -1,37 +1,45 @@
-let z, i;
-function w(c) {
-  z = c.Box3, i = c.Vector3;
-}
-function f(c) {
-  const n = c.getAttribute("position"), l = new z();
-  l.center = new i();
-  for (let t = 0; t < n.count; t++) {
-    const e = new i();
-    e.fromBufferAttribute(n, t), l.expandByPoint(e);
-    const o = n[t], r = n[t + 1], s = n[t + 2];
-    l.center.add(new i(o, r, s));
+function f(n, i) {
+  const r = i.getAttribute("position"), l = new n.Box3();
+  l.center = new n.Vector3();
+  for (let c = 0; c < r.count; c++) {
+    const p = new n.Vector3();
+    p.fromBufferAttribute(r, c), l.expandByPoint(p);
+    const A = r[c], e = r[c + 1], t = r[c + 2];
+    l.center.add(new n.Vector3(A, e, t));
   }
-  return l.center.divideScalar(n.count / 3), l;
+  return l.center.divideScalar(r.count / 3), l;
 }
-const h = function(c, n, l) {
-  const t = f(n), e = n.attributes.position.array;
-  for (let o = 0; o < e.length; o += 3) {
-    const r = parseFloat(e[o]), s = parseFloat(e[o + 1]), m = parseFloat(e[o + 2]);
-    if (l === "x") {
-      const g = (r - t.min.x) / (t.max.x - t.min.x), a = c.getTangentAt(g).normalize(), x = c.getPointAt(g);
-      let d;
-      s >= t.center.y ? d = new i(-a.y, a.x, 0).normalize() : d = new i(a.y, -a.x, 0).normalize();
-      let p;
-      m >= t.center.z ? p = new i(0, -a.z, -a.x).normalize() : p = new i(0, a.z, a.x).normalize();
-      const y = d.clone().multiplyScalar(Math.abs(s)), b = p.clone().multiplyScalar(Math.abs(m)), u = y.clone().add(b);
-      e[o] = x.x + u.x, e[o + 1] = x.y + u.y, e[o + 2] = x.z + u.z;
+const Q = function({
+  THREE: n,
+  curve: i,
+  quaternion: r,
+  orientation: l,
+  bufferGeometry: c,
+  axis: p,
+  scene: A
+}) {
+  const e = f(n, c), t = c.attributes.position.array;
+  for (let o = 0; o < t.length; o += 3) {
+    const y = parseFloat(t[o]), u = parseFloat(t[o + 1]), h = parseFloat(t[o + 2]);
+    if (p === "x") {
+      const s = (y - e.min.x) / (e.max.x - e.min.x), d = i.getPointAt(s), m = i.getTangentAt(s).normalize(), g = (l || new n.Vector3(0, 0, 1).applyQuaternion(r).normalize().multiplyScalar(1e6)).clone().cross(m.clone()).normalize(), x = new n.Quaternion().setFromAxisAngle(m.clone(), Math.atan2(h, u));
+      g.applyQuaternion(x);
+      const z = g.clone().setLength(new n.Vector3(0, u, h).length()), a = d.clone().add(z);
+      t[o] = a.x, t[o + 1] = a.y, t[o + 2] = a.z;
+    } else if (p === "z") {
+      const s = (h - e.min.z) / (e.max.z - e.min.z), d = i.getPointAt(s), m = i.getTangentAt(s).normalize(), g = (l || new n.Vector3(1, 0, 0).applyQuaternion(r).normalize().multiplyScalar(1e6)).clone().cross(m.clone()).normalize(), x = new n.Quaternion().setFromAxisAngle(m.clone(), Math.atan2(u, y) + Math.PI / 2);
+      g.applyQuaternion(x);
+      const z = g.clone().setLength(new n.Vector3(y, u, 0).length()), a = d.clone().add(z);
+      t[o] = a.x, t[o + 1] = a.y, t[o + 2] = a.z;
+    } else if (p === "y") {
+      const s = (u - e.min.y) / (e.max.y - e.min.y), d = i.getPointAt(s), m = i.getTangentAt(s).normalize(), g = (l.normalize().multiplyScalar(1e6) || new n.Vector3(0, 1, 0).applyQuaternion(r).normalize().multiplyScalar(1e6)).clone().cross(m.clone()).normalize(), x = new n.Quaternion().setFromAxisAngle(m.clone(), Math.atan2(y, h));
+      g.applyQuaternion(x);
+      const z = g.clone().setLength(new n.Vector3(y, 0, h).length()), a = d.clone().add(z);
+      t[o] = a.x, t[o + 1] = a.y, t[o + 2] = a.z;
     }
   }
-  n.attributes.position.needsUpdate = !0;
-}, B = {
-  bend: h,
-  load3: w
+  c.attributes.position.needsUpdate = !0;
 };
 export {
-  B as flexy
+  Q as bend
 };
