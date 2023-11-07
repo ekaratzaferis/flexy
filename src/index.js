@@ -148,88 +148,42 @@ export const bend = function({
     bufferGeometry.attributes.position.needsUpdate = true;
 };
 
-export const wrap = function({
-    THREE, reflectionMap, obj, scene
-}) {
-
-    const A = new THREE.Vector3(reflectionMap.collisionPlane.A.x, reflectionMap.collisionPlane.A.y, reflectionMap.collisionPlane.A.z);
-    const B = new THREE.Vector3(reflectionMap.collisionPlane.B.x, reflectionMap.collisionPlane.B.y, reflectionMap.collisionPlane.B.z);
-    const C = new THREE.Vector3(reflectionMap.collisionPlane.C.x, reflectionMap.collisionPlane.C.y, reflectionMap.collisionPlane.C.z);
-
-    const vector1 = new THREE.Vector3().subVectors(B, A);
-    const vector2 = new THREE.Vector3().subVectors(C, A);
-    const normal = new THREE.Vector3().crossVectors(vector1, vector2).normalize();
-    const collisionPlane = new THREE.Plane();
-    collisionPlane.setFromNormalAndCoplanarPoint(normal, A);
-
-    // drawPlane(THREE, collisionPlane, B, scene);
-
-    const positions = obj.geometry.attributes.position.array;
-
-    for (let i = 0; i < positions.length; i += 3) {
-        const x = parseFloat(positions[i]);
-        const y = parseFloat(positions[i + 1]);
-        const z = parseFloat(positions[i + 2]);
-
-        const point = new THREE.Vector3(x, y, z);
-        point.applyMatrix4(obj.matrixWorld);
-
-        // Step 1: Compute the dot product between the point and the normal of the plane
-        const dotProduct = point.clone().sub(A).dot(collisionPlane.normal);
-        // Step 2: Compute the fully projected vector of the point onto the plane normal
-        const projection = collisionPlane.normal.clone().multiplyScalar(dotProduct / collisionPlane.normal.lengthSq());
-        // Step 3: Subtract the projection from the original point to get its projection on the plane
-        const projectedPoint = point.clone().sub(projection);
-
-        const key = hashFunction(projectedPoint.x, projectedPoint.y, projectedPoint.z, reflectionMap.resolution);
-        const coords = reflectionMap.data[key];
-        if (!coords) {
-            console.error('asdads');
-            continue;
-        }
-        const faceNormal = new THREE.Vector3(coords.normal.x, coords.normal.y, coords.normal.z);
-
-        const dummyObject = new THREE.Object3D();
-        dummyObject.lookAt(faceNormal);
-        const newPoint = new THREE.Vector3(x, y, z);
-        const final = newPoint.clone().applyQuaternion(dummyObject.quaternion);
-
-        if (i % 5 === 2) {
-            // drawVector(THREE, scene, point.clone(), projectedPoint, '#f00');
-            // drawVector(THREE, scene, point.clone(), point.clone().add(faceNormal), '#ff0');
-            // drawVector(THREE, scene, point.clone(), new THREE.Vector3(coords.point.x, coords.point.y, coords.point.z), '#ff0');
-        }
-
-        positions[i] = final.x;
-        positions[i + 1] = final.y;
-        positions[i + 2] = final.z;
-    }
-
-    obj.geometry.attributes.position.needsUpdate = true;
-
-};
-
-export const getReflectionMap = function({
-    THREE, surface, resolution, collisionPlane, scene
+/**
+ * Generates a point to face normal map.
+ * We're mapping each point of the casting rectangular to a face normal in the surface.
+ * This happens by casting rays from the rectangular shape to the surface and remembering the collision point.
+ * @param {Object} options The options object
+ * @param {Library} options.THREE The THREE instance from your app.
+ * @param {Mesh} options.surface The surface that contains the face normals.
+ * @param {Object} [options.castingRectangular] The rectangular from where the points originate.
+ * @param {Vector3} [options.castingRectangular.A] A vector that indicates the top left corner
+ * @param {Vector3} [options.castingRectangular.B] A vector that indicates the top right corner
+ * @param {Vector3} [options.castingRectangular.C] A vector that indicates the bottom right corner
+ * @param {Vector3} [options.castingRectangular.C] A vector that indicates the bottom left corner
+ * @param {Vector3} [options.castingRectangular.direction] The direction that each ray should have in order to hit the surface
+ * @param {Number} options.resolution How many points should we interpolate between corner A and B of the given rectangular
+ */
+export const getPointToFaceNormalMap = function({
+    THREE, surface, castingRectangular, resolution, scene
 }) {
 
     const map = {};
 
-    // drawVector(THREE, scene, collisionPlane.A, collisionPlane.B, '#f0f');
-    // drawVector(THREE, scene, collisionPlane.B, collisionPlane.C, '#f0f');
-    // drawVector(THREE, scene, collisionPlane.C, collisionPlane.D, '#f0f');
-    // drawVector(THREE, scene, collisionPlane.D, collisionPlane.A, '#f0f');
+    drawVector(THREE, scene, castingRectangular.A, castingRectangular.B, '#f0f');
+    drawVector(THREE, scene, castingRectangular.B, castingRectangular.C, '#f0f');
+    drawVector(THREE, scene, castingRectangular.C, castingRectangular.D, '#f0f');
+    drawVector(THREE, scene, castingRectangular.D, castingRectangular.A, '#f0f');
 
     for (let i = 0; i <= resolution; i++) {
-        const pStart = interpolatePoints(THREE, collisionPlane.A, collisionPlane.D, resolution)[i];
-        const pEnd = interpolatePoints(THREE, collisionPlane.B, collisionPlane.C, resolution)[i];
+        const pStart = interpolatePoints(THREE, castingRectangular.A, castingRectangular.D, resolution)[i];
+        const pEnd = interpolatePoints(THREE, castingRectangular.B, castingRectangular.C, resolution)[i];
         const pointsLine = interpolatePoints(THREE, pStart, pEnd, resolution);
 
         pointsLine.forEach(point => {
-            const raycaster = new THREE.Raycaster(point, collisionPlane.direction.normalize());
+            const raycaster = new THREE.Raycaster(point, castingRectangular.direction.normalize());
             const intersects = raycaster.intersectObject(surface);
 
-            // drawVector(THREE, scene, point.clone(), point.clone().add(collisionPlane.direction.clone().normalize()), '#f0f');
+            // drawVector(THREE, scene, point.clone(), point.clone().add(castingRectangular.direction.clone().normalize()), '#f0f');
 
             if (intersects.length > 0) {
                 map[hashFunction(point.x, point.y, point.z, resolution)] = {
@@ -253,35 +207,94 @@ export const getReflectionMap = function({
 
     return {
         data: map,
-        collisionPlane: {
+        castingRectangular: {
             A: {
-                x: collisionPlane.A.x,
-                y: collisionPlane.A.y,
-                z: collisionPlane.A.z
+                x: castingRectangular.A.x,
+                y: castingRectangular.A.y,
+                z: castingRectangular.A.z
             },
             B: {
-                x: collisionPlane.B.x,
-                y: collisionPlane.B.y,
-                z: collisionPlane.B.z
+                x: castingRectangular.B.x,
+                y: castingRectangular.B.y,
+                z: castingRectangular.B.z
             },
             C: {
-                x: collisionPlane.C.x,
-                y: collisionPlane.C.y,
-                z: collisionPlane.C.z
+                x: castingRectangular.C.x,
+                y: castingRectangular.C.y,
+                z: castingRectangular.C.z
             },
             D: {
-                x: collisionPlane.D.x,
-                y: collisionPlane.D.y,
-                z: collisionPlane.D.z
+                x: castingRectangular.D.x,
+                y: castingRectangular.D.y,
+                z: castingRectangular.D.z
             },
             direction: {
-                x: collisionPlane.direction.x,
-                y: collisionPlane.direction.y,
-                z: collisionPlane.direction.z
+                x: castingRectangular.direction.x,
+                y: castingRectangular.direction.y,
+                z: castingRectangular.direction.z
             }
         },
         resolution
     };
+};
+
+export const wrap = function({
+    THREE, pointToFaceNormalMap, obj, scene
+}) {
+
+    // Calculate the plane that's defined by the casting rectangular shape //
+    const rect = pointToFaceNormalMap.castingRectangular;
+    const A = new THREE.Vector3(rect.A.x, rect.A.y, rect.A.z);
+    const B = new THREE.Vector3(rect.B.x, rect.B.y, rect.B.z);
+    const C = new THREE.Vector3(rect.C.x, rect.C.y, rect.C.z);
+
+    const vector1 = new THREE.Vector3().subVectors(B, A);
+    const vector2 = new THREE.Vector3().subVectors(C, A);
+    const normal = new THREE.Vector3().crossVectors(vector1, vector2).normalize();
+    const castingRectangularPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, A);
+
+    // drawPlane(THREE, castingRectangularPlane, B, scene);
+
+    const positions = obj.geometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+        const x = parseFloat(positions[i]);
+        const y = parseFloat(positions[i + 1]);
+        const z = parseFloat(positions[i + 2]);
+
+        const point = new THREE.Vector3(x, y, z);
+        point.applyMatrix4(obj.matrixWorld);
+
+        // Project each point of the obj to the casting rectangular plane //
+        const dotProduct = point.clone().sub(A).dot(castingRectangularPlane.normal);
+        const projection = castingRectangularPlane.normal.clone().multiplyScalar(dotProduct / castingRectangularPlane.normal.lengthSq());
+        const projectedPoint = point.clone().sub(projection);
+
+        // Find the corresponding face normal using the hashed data map //
+        const key = hashFunction(projectedPoint.x, projectedPoint.y, projectedPoint.z, pointToFaceNormalMap.resolution);
+        const coords = pointToFaceNormalMap.data[key];
+        if (!coords) throw new Error(`Cannot find face normal for posision ${x} - ${y} - ${z}`);
+        const faceNormal = new THREE.Vector3(coords.normal.x, coords.normal.y, coords.normal.z);
+
+        // Create a dummy object and make it lookAt the face normal we just found //
+        const dummyObject = new THREE.Object3D();
+        dummyObject.lookAt(faceNormal);
+
+        // Apply the same rotation that it took to make the dummy object to look at the normal, to our point //
+        const modifiedPoint = new THREE.Vector3(x, y, z).applyQuaternion(dummyObject.quaternion);
+
+        positions[i] = modifiedPoint.x;
+        positions[i + 1] = modifiedPoint.y;
+        positions[i + 2] = modifiedPoint.z;
+
+        if (i % 5 === 2) {
+            // drawVector(THREE, scene, point.clone(), projectedPoint, '#f00');
+            // drawVector(THREE, scene, point.clone(), point.clone().add(faceNormal), '#ff0');
+            // drawVector(THREE, scene, point.clone(), new THREE.Vector3(coords.point.x, coords.point.y, coords.point.z), '#ff0');
+        }
+    }
+
+    obj.geometry.attributes.position.needsUpdate = true;
+
 };
 
 function hashFunction(x, y, z, resolution) {

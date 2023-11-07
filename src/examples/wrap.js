@@ -86,11 +86,11 @@ animate();
     const ring = new THREE.Mesh(ringG, material);
     scene.add(ring);
 
-    // const reflectionMap = flexy.getReflectionMap({
+    // const pointToFaceMap = flexy.getPointToFaceNormalMap({
     //     THREE,
     //     surface: ring,
     //     resolution: 100,
-    //     collisionPlane: {
+    //     castingRectangular: {
     //         A: new THREE.Vector3(7, 1, 4),
     //         B: new THREE.Vector3(7, 1, -4),
     //         C: new THREE.Vector3(11, -5, -4),
@@ -99,12 +99,12 @@ animate();
     //     },
     //     scene
     // });
-    // console.log(JSON.stringify(reflectionMap.data))
+    // console.log(JSON.stringify(pointToFaceMap.data))
 
-    const reflectionMap = {
+    const pointToFaceMap = {
         data: mapJSON,
         resolution: 100,
-        collisionPlane: {
+        castingRectangular: {
             A: new THREE.Vector3(7, 1, 4),
             B: new THREE.Vector3(7, 1, -4),
             C: new THREE.Vector3(11, -5, -4),
@@ -115,7 +115,7 @@ animate();
 
     flexy.wrap({
         THREE,
-        reflectionMap,
+        pointToFaceNormalMap: pointToFaceMap,
         obj: design,
         scene
     });
