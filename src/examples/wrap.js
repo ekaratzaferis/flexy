@@ -125,4 +125,22 @@ animate();
     design.rotateZ(-0.5);
     design.position.y = -2.6;
     design.position.x = 7;
+
+    const designProps = {
+        scale: 0.6
+    };
+    const gui = new dat.GUI();
+    const shapeFolder = gui.addFolder('Design');
+    shapeFolder.open();
+    shapeFolder.add(designProps, 'scale', 0.2, 1.2).onChange(() => {
+        design.scale.x = designProps.scale;
+        design.scale.y = designProps.scale;
+        design.scale.z = designProps.scale;
+        flexy.wrap({
+            THREE,
+            pointToFaceNormalMap: pointToFaceMap,
+            obj: design,
+            scene
+        });
+    });
 })();
