@@ -1,4 +1,4 @@
-import * as flexy from './src';
+import * as flexy from '..';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
