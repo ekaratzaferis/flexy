@@ -61,67 +61,68 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 
 animate();
 
+(async function() {
+    const loader = new STLLoader();
+    const material = new THREE.MeshNormalMaterial({ wireframe: false });
+    const loadSTL = async function(name) {
+        return new Promise(res => {
+            loader.load(name, res);
+        });
+    };
 
-const loader = new STLLoader();
-const material = new THREE.MeshNormalMaterial({ wireframe: false });
-const loadSTL = async function(name) {
-    return new Promise(res => {
-        loader.load(name, res);
+    const designG = await loadSTL('topDesign.stl');
+    const design = new THREE.Mesh(designG, material);
+    design.position.y = -2;
+    design.position.x = 10;
+    design.rotateY(Math.PI / 2);
+    design.rotateX(1);
+    design.scale.x = 0.6;
+    design.scale.y = 0.6;
+    design.scale.z = 0.6;
+    design.geometry.attributes.position.needsUpdate = true;
+    scene.add(design);
+
+    const ringG = await loadSTL('unprocessed.stl');
+    const ring = new THREE.Mesh(ringG, material);
+    scene.add(ring);
+
+    // const reflectionMap = flexy.getReflectionMap({
+    //     THREE,
+    //     surface: ring,
+    //     resolution: 100,
+    //     collisionPlane: {
+    //         A: new THREE.Vector3(7, 1, 4),
+    //         B: new THREE.Vector3(7, 1, -4),
+    //         C: new THREE.Vector3(11, -5, -4),
+    //         D: new THREE.Vector3(11, -5, 4),
+    //         direction: new THREE.Vector3(-6, -6, 0).normalize(),
+    //     },
+    //     scene
+    // });
+    // console.log(JSON.stringify(reflectionMap.data))
+
+    const reflectionMap = {
+        data: mapJSON,
+        resolution: 100,
+        collisionPlane: {
+            A: new THREE.Vector3(7, 1, 4),
+            B: new THREE.Vector3(7, 1, -4),
+            C: new THREE.Vector3(11, -5, -4),
+            D: new THREE.Vector3(11, -5, 4),
+            direction: new THREE.Vector3(-6, -6, 0).normalize()
+        }
+    };
+
+    flexy.wrap({
+        THREE,
+        reflectionMap,
+        obj: design,
+        scene
     });
-}
 
-const designG = await loadSTL('topDesign.stl')
-const design = new THREE.Mesh(designG, material);
-design.position.y = -2;
-design.position.x = 10;
-design.rotateY(Math.PI / 2);
-design.rotateX(1);
-design.scale.x = 0.6;
-design.scale.y = 0.6;
-design.scale.z = 0.6;
-design.geometry.attributes.position.needsUpdate = true;
-scene.add(design);
-
-const ringG = await loadSTL('unprocessed.stl');
-const ring = new THREE.Mesh(ringG, material);
-scene.add(ring);
-
-// const reflectionMap = flexy.getReflectionMap({
-//     THREE,
-//     surface: ring,
-//     resolution: 100,
-//     collisionPlane: {
-//         A: new THREE.Vector3(7, 1, 4),
-//         B: new THREE.Vector3(7, 1, -4),
-//         C: new THREE.Vector3(11, -5, -4),
-//         D: new THREE.Vector3(11, -5, 4),
-//         direction: new THREE.Vector3(-6, -6, 0).normalize(),
-//     },
-//     scene
-// });
-// console.log(JSON.stringify(reflectionMap.data))
-
-const reflectionMap = {
-    data: mapJSON,
-    resolution: 100,
-    collisionPlane: {
-        A: new THREE.Vector3(7, 1, 4),
-        B: new THREE.Vector3(7, 1, -4),
-        C: new THREE.Vector3(11, -5, -4),
-        D: new THREE.Vector3(11, -5, 4),
-        direction: new THREE.Vector3(-6, -6, 0).normalize(),
-    }
-}
-
-flexy.wrap({
-    THREE,
-    reflectionMap,
-    obj: design,
-    scene
-})
-
-design.rotateY(-Math.PI / 2);
-design.rotateX(0);
-design.rotateZ(-0.5);
-design.position.y = -2.6;
-design.position.x = 7;
+    design.rotateY(-Math.PI / 2);
+    design.rotateX(0);
+    design.rotateZ(-0.5);
+    design.position.y = -2.6;
+    design.position.x = 7;
+})();

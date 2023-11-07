@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 
 dns.setDefaultResultOrder('verbatim');
 export default defineConfig({
+    publicDir: false, // Disable serving files from public directory
     server: {
         host: true
     },

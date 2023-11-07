@@ -9,7 +9,8 @@
     "browser": true
   },
   "globals": {
-    "dat": true
+    "dat": true,
+    "__dirname": true
   },
   "rules": {
     "for-direction": "error",
