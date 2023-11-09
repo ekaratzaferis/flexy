@@ -1,7 +1,7 @@
 {
   "name": "flexy-bend",
   "private": false,
-  "version": "0.0.4",
+  "version": "0.0.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,8 +10,8 @@
   },
   "exports": {
     ".": {
-      "import": "./dist/flexy.js",
-      "require": "./dist/flexy.umd.cjs"
+      "import": "./dist/flexy-bend.js",
+      "require": "./dist/flexy-bend.umd.cjs"
     }
   },
   "dependencies": {},
