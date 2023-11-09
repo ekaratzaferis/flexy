@@ -120,11 +120,17 @@ animate();
         scene
     });
 
-    design.rotateY(-Math.PI / 2);
-    design.rotateX(0);
-    design.rotateZ(-0.5);
-    design.position.y = -2.6;
-    design.position.x = 7;
+    // design.rotateY(-Math.PI / 2);
+    // design.rotateX(0);
+    // design.rotateZ(-0.5);
+    // design.position.y = -2.6;
+    // design.position.x = 7;
+
+    // design.position.y = 0;
+    // design.position.x = 0;
+    // design.rotateY(0);
+    // design.rotateX(0);
+    // design.rotateZ(0);
 
     const designProps = {
         scale: 0.6

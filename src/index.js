@@ -32,17 +32,19 @@ function calculateBoundingBox(THREE, bufferGeometry) {
  * @param {Object} options The options object
  * @param {Library} options.THREE The THREE instance from your app.
  * @param {CubicBezierCurve3} options.curve The curve based on which we will curve the geometry
- * @param {Quaternion} options.quaternion A quaternion that indicates the overall orientation of the curve
- * @param {Vector3} [options.orientation] Instead of the orientation, directly provide the exact vector that indicates the orientation
+ * @param {Quaternion} [options.quaternion] A quaternion that indicates the overall orientation of the curve
+ * @param {Vector3} [options.orientation] Instead of the quaternion, directly provide the exact vector that indicates the orientation
+ * @param {Vector3} [options.preserveDimensions] If set to true, it won't strech the geometry along the axis. Defaults to false.
  * @param {bufferGeometry} options.bufferGeometry The geometry that will be bent
  * @param {String} options.axis Which axis will be ajusted to the given curve
  */
 export const bend = function({
-    THREE, curve, quaternion, orientation, bufferGeometry, axis, scene
+    THREE, curve, quaternion, orientation, bufferGeometry, axis, preserveDimensions = false, scene
 }) {
 
     // Bounding boxes of geometry //
     const geometryBB = calculateBoundingBox(THREE, bufferGeometry);
+    const curveLength = preserveDimensions ? getCurveLength(curve) : 0;
     const positions = bufferGeometry.attributes.position.array;
 
     for (let i = 0; i < positions.length; i += 3) {
@@ -54,7 +56,16 @@ export const bend = function({
         if (axis === 'x') {
 
             // Normalize 0..1 the x coordinate relative to the geometry's length //
-            const howFarAlongInTheGeometry = (x - geometryBB.min.x) / (geometryBB.max.x - geometryBB.min.x);
+            let howFarAlongInTheGeometry = (x - geometryBB.min.x) / (geometryBB.max.x - geometryBB.min.x);
+
+            // Moves interpolation around the center of the curve and preserves the ration of curve to geometry "length"
+            const geometryLength = geometryBB.max.x - geometryBB.min.x;
+            if (preserveDimensions && geometryLength <= curveLength) {
+                const lengthRatio = geometryLength / curveLength;
+                const startPointOnCurve = 0.5 - (lengthRatio / 2);
+                const endPointOnCurve = 0.5 + (lengthRatio / 2);
+                howFarAlongInTheGeometry = startPointOnCurve + (howFarAlongInTheGeometry * (endPointOnCurve - startPointOnCurve));
+            }
 
             // In the given curve, get the tanget line at that point //
             const tangentPoint = curve.getPointAt(howFarAlongInTheGeometry);
@@ -89,7 +100,16 @@ export const bend = function({
         } else if (axis === 'z') {
 
             // Normalize 0..1 the z coordinate relative to the geometry's length //
-            const howFarAlongInTheGeometry = (z - geometryBB.min.z) / (geometryBB.max.z - geometryBB.min.z);
+            let howFarAlongInTheGeometry = (z - geometryBB.min.z) / (geometryBB.max.z - geometryBB.min.z);
+
+            // Moves interpolation around the center of the curve and preserves the ration of curve to geometry "length"
+            const geometryLength = geometryBB.max.y - geometryBB.min.y;
+            if (preserveDimensions && geometryLength <= curveLength) {
+                const lengthRatio = geometryLength / curveLength;
+                const startPointOnCurve = 0.5 - (lengthRatio / 2);
+                const endPointOnCurve = 0.5 + (lengthRatio / 2);
+                howFarAlongInTheGeometry = startPointOnCurve + (howFarAlongInTheGeometry * (endPointOnCurve - startPointOnCurve));
+            }
 
             // In the given curve, get the tanget line at that point //
             const tangentPoint = curve.getPointAt(howFarAlongInTheGeometry);
@@ -117,14 +137,23 @@ export const bend = function({
         } else if (axis === 'y') {
 
             // Normalize 0..1 the z coordinate relative to the geometry's length //
-            const howFarAlongInTheGeometry = (y - geometryBB.min.y) / (geometryBB.max.y - geometryBB.min.y);
+            let howFarAlongInTheGeometry = (y - geometryBB.min.y) / (geometryBB.max.y - geometryBB.min.y);
+
+            // Moves interpolation around the center of the curve and preserves the ration of curve to geometry "length"
+            const geometryLength = geometryBB.max.z - geometryBB.min.z;
+            if (preserveDimensions && geometryLength <= curveLength) {
+                const lengthRatio = geometryLength / curveLength;
+                const startPointOnCurve = 0.5 - (lengthRatio / 2);
+                const endPointOnCurve = 0.5 + (lengthRatio / 2);
+                howFarAlongInTheGeometry = startPointOnCurve + (howFarAlongInTheGeometry * (endPointOnCurve - startPointOnCurve));
+            }
 
             // In the given curve, get the tanget line at that point //
             const tangentPoint = curve.getPointAt(howFarAlongInTheGeometry);
             const tangent = curve.getTangent(howFarAlongInTheGeometry);
 
             // Find an orthogonal vector to the tangent normal //
-            const referenceNormal = orientation.normalize().multiplyScalar(1000000) || new THREE.Vector3(0, 1, 0).applyQuaternion(quaternion).normalize().multiplyScalar(1000000);
+            const referenceNormal = orientation || new THREE.Vector3(1, 0, 0).applyQuaternion(quaternion).normalize().multiplyScalar(1000000);
             const orthogonal = referenceNormal.clone().cross(tangent.clone()).normalize();
 
             // We calculate the rotation needed in order to rotate our tangent line in the same angle that our geometry point is rotated //
@@ -169,10 +198,10 @@ export const getPointToFaceNormalMap = function({
 
     const map = {};
 
-    drawVector(THREE, scene, castingRectangular.A, castingRectangular.B, '#f0f');
-    drawVector(THREE, scene, castingRectangular.B, castingRectangular.C, '#f0f');
-    drawVector(THREE, scene, castingRectangular.C, castingRectangular.D, '#f0f');
-    drawVector(THREE, scene, castingRectangular.D, castingRectangular.A, '#f0f');
+    // drawVector(THREE, scene, castingRectangular.A, castingRectangular.B, '#f0f');
+    // drawVector(THREE, scene, castingRectangular.B, castingRectangular.C, '#f0f');
+    // drawVector(THREE, scene, castingRectangular.C, castingRectangular.D, '#f0f');
+    // drawVector(THREE, scene, castingRectangular.D, castingRectangular.A, '#f0f');
 
     for (let i = 0; i <= resolution; i++) {
         const pStart = interpolatePoints(THREE, castingRectangular.A, castingRectangular.D, resolution)[i];
@@ -262,7 +291,8 @@ export const wrap = function({
         const z = parseFloat(positions[i + 2]);
 
         const point = new THREE.Vector3(x, y, z);
-        point.applyMatrix4(obj.matrixWorld);
+        const matrixWorld = obj.matrixWorld.clone();
+        point.applyMatrix4(matrixWorld.clone());
 
         // Project each point of the obj to the casting rectangular plane //
         const dotProduct = point.clone().sub(A).dot(castingRectangularPlane.normal);
@@ -280,7 +310,7 @@ export const wrap = function({
         dummyObject.lookAt(faceNormal);
 
         // Apply the same rotation that it took to make the dummy object to look at the normal, to our point //
-        const modifiedPoint = new THREE.Vector3(x, y, z).applyQuaternion(dummyObject.quaternion);
+        const modifiedPoint = new THREE.Vector3(x, y, z).applyQuaternion(dummyObject.quaternion.clone());
 
         positions[i] = modifiedPoint.x;
         positions[i + 1] = modifiedPoint.y;
@@ -326,6 +356,20 @@ function interpolatePoints(THREE, p1, p2, divisions) {
         points.push(point);
     }
     return points;
+}
+
+function getCurveLength(curve) {
+    const steps = 100; // More steps means a more accurate length
+    let curveLength = 0;
+    let lastPoint = curve.getPointAt(0);
+
+    for (let i = 1; i <= steps; i++) {
+        const point = curve.getPointAt(i / steps);
+        curveLength += point.distanceTo(lastPoint);
+        lastPoint = point;
+    }
+
+    return curveLength;
 }
 
 function drawVector(THREE, scene, startPoint = {

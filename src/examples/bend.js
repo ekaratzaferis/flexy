@@ -1,5 +1,6 @@
 import * as flexy from '..';
 import * as THREE from 'three';
+import { DragControls } from 'three/addons/controls/DragControls.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 // ----------------------------------- //
@@ -209,17 +210,6 @@ function updateGeometry() {
     if (settings.box.wireframe) scene.add(tube);
     toBeCleaned.push(tube);
 
-    flexy.bend({
-        THREE,
-        curve,
-        quaternion: new THREE.Quaternion().setFromAxisAngle(rotationVector, settings.firstCurve.rotation),
-        // orientation: new THREE.Vector3(0, 0, 1),
-        bufferGeometry: mesh.geometry,
-        axis: 'x',
-        scene
-    });
-    // mesh.visible = false;
-
     if (settings.secondAxisBend) {
 
         settings.secondCurve.rotation += Math.PI / 2;
@@ -235,11 +225,24 @@ function updateGeometry() {
             quaternion: new THREE.Quaternion().setFromAxisAngle(curve2.rotationVector, settings.secondCurve.rotation),
             // orientation: new THREE.Vector3(1, 0, 0),
             bufferGeometry: mesh.geometry,
+            preserveDimensions: settings.box.preserveDimensions,
             axis: 'z',
             scene
         });
 
     }
+
+    flexy.bend({
+        THREE,
+        curve,
+        quaternion: new THREE.Quaternion().setFromAxisAngle(rotationVector, settings.firstCurve.rotation),
+        // orientation: new THREE.Vector3(0, 0, 1),
+        bufferGeometry: mesh.geometry,
+        axis: 'x',
+        preserveDimensions: settings.box.preserveDimensions,
+        scene
+    });
+    // mesh.visible = false;
 }
 
 // ----------------------------------- //
@@ -254,7 +257,8 @@ const settings = {
         widthSegments: 60,
         heightSegments: 10,
         depthSegments: 10,
-        wireframe: false
+        wireframe: false,
+        preserveDimensions: false
     },
     firstCurve: {
         type: '3d_arc',
@@ -270,7 +274,7 @@ const settings = {
     secondCurve: {
         type: 'arc',
         rotation: 0,
-        arcR: 10,
+        arcR: 1,
         ellipseA: 15,
         ellipseB: 10,
         sineX0: 0,
@@ -289,6 +293,7 @@ shapeFolder.add(settings.box, 'depth', 1, 30).onChange(updateGeometry);
 shapeFolder.add(settings.box, 'widthSegments', 1, 60).onChange(updateGeometry);
 shapeFolder.add(settings.box, 'heightSegments', 1, 60).onChange(updateGeometry);
 shapeFolder.add(settings.box, 'depthSegments', 1, 60).onChange(updateGeometry);
+shapeFolder.add(settings.box, 'preserveDimensions').onChange(updateGeometry);
 
 const firstBend = gui.addFolder('First Bend on axis');
 firstBend.open();
