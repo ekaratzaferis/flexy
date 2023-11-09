@@ -11,7 +11,8 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 main: resolve(__dirname, 'index.html'),
-                other: resolve(__dirname, 'wrap.html')
+                wrap: resolve(__dirname, 'wrap.html'),
+                curve: resolve(__dirname, 'curve.html')
             }
         }
     }
