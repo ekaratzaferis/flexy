@@ -11,7 +11,7 @@ export default defineConfig({
         target: 'esnext',
         lib: {
             entry: 'src/index.js',
-            name: 'flexy',
+            name: 'flexy-bend',
             formats: [
                 'es',
                 'umd',
