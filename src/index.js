@@ -103,7 +103,7 @@ export const bend = function({
             let howFarAlongInTheGeometry = (z - geometryBB.min.z) / (geometryBB.max.z - geometryBB.min.z);
 
             // Moves interpolation around the center of the curve and preserves the ration of curve to geometry "length"
-            const geometryLength = geometryBB.max.y - geometryBB.min.y;
+            const geometryLength = geometryBB.max.z - geometryBB.min.z;
             if (preserveDimensions && geometryLength <= curveLength) {
                 const lengthRatio = geometryLength / curveLength;
                 const startPointOnCurve = 0.5 - (lengthRatio / 2);
@@ -140,7 +140,7 @@ export const bend = function({
             let howFarAlongInTheGeometry = (y - geometryBB.min.y) / (geometryBB.max.y - geometryBB.min.y);
 
             // Moves interpolation around the center of the curve and preserves the ration of curve to geometry "length"
-            const geometryLength = geometryBB.max.z - geometryBB.min.z;
+            const geometryLength = geometryBB.max.y - geometryBB.min.y;
             if (preserveDimensions && geometryLength <= curveLength) {
                 const lengthRatio = geometryLength / curveLength;
                 const startPointOnCurve = 0.5 - (lengthRatio / 2);

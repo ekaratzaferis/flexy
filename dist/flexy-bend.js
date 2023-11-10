@@ -35,7 +35,7 @@ const O = function({
       s[a] = x.x, s[a + 1] = x.y, s[a + 2] = x.z;
     } else if (r === "z") {
       let y = (A - i.min.z) / (i.max.z - i.min.z);
-      const p = i.max.y - i.min.y;
+      const p = i.max.z - i.min.z;
       if (m && p <= z) {
         const w = p / z, f = 0.5 - w / 2, V = 0.5 + w / 2;
         y = f + y * (V - f);
@@ -46,7 +46,7 @@ const O = function({
       s[a] = x.x, s[a + 1] = x.y, s[a + 2] = x.z;
     } else if (r === "y") {
       let y = (d - i.min.y) / (i.max.y - i.min.y);
-      const p = i.max.z - i.min.z;
+      const p = i.max.y - i.min.y;
       if (m && p <= z) {
         const w = p / z, f = 0.5 - w / 2, V = 0.5 + w / 2;
         y = f + y * (V - f);
