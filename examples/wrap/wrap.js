@@ -1,6 +1,6 @@
-import * as flexy from '..';
 import * as THREE from 'three';
-import mapJSON from '../../map.json';
+import mapJSON from './map.json';
+import * as flexy from '../../flexy';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 

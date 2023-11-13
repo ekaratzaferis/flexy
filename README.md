@@ -1,18 +1,16 @@
 # flexy
 A library that bends three.js box geometries along Bezier Curves
 
+# Demo
+
+[Play along with different curves and double bends!](https://ekaratzaferis.github.io/flexy/examples/base/)
+
 # How to install
 
 As an es6 module
 
 ```
 npm install flexy
-```
-
-or from a CDN
-
-```
-<script src="http://"></script>
 ```
 
 # How to use it

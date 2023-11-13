@@ -1,6 +1,5 @@
-import * as flexy from '..';
 import * as THREE from 'three';
-import { DragControls } from 'three/addons/controls/DragControls.js';
+import * as flexy from '../../flexy';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 // ----------------------------------- //

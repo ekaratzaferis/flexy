@@ -10,7 +10,7 @@ export default defineConfig({
     build: {
         target: 'esnext',
         lib: {
-            entry: 'src/index.js',
+            entry: 'flexy.js',
             name: 'flexy-bend',
             formats: [
                 'es',
