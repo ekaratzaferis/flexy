@@ -1,13 +1,21 @@
 {
   "name": "flexy-bend",
   "private": false,
-  "version": "0.0.7",
+  "version": "0.0.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build --config vite.lib.config.js && vite build --outDir=docs --base=/flexy",
     "preview": "vite preview"
   },
+  "keywords": [
+    "bend",
+    "geometry",
+    "three",
+    "threejs",
+    "flex",
+    "curve"
+  ],
   "exports": {
     ".": {
       "import": "./dist/flexy-bend.js",
