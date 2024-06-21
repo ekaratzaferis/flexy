@@ -31,16 +31,17 @@ const endPoint = new Vector3(0, R, 0);
 // That will make the modified geometry appear as it was also rotated.
 const curve = new CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
 
-// Indicates the orientation of the hypothetical plane that the curve could "rest" upon. For example, a curve in the x-y plane, could be rest flat upon the (0, 0, 1) or (0, 0, -1) plane.
+// A vector that is perpendigular to the plane where most points of the curve lie upon.
+// So, if you have a curve that's on the x-y axis, then the orientation could be 0,0,1 or 0,0,-1
 // This is usefull to the modifier because it can consistently calculate the tangent lines for each point in the curve, therefore bend every point of the geometry to the correct position.
 const orientation = new new THREE.Vector3(0, 0, 1);
 
 flexy.bend({
     THREE,
+    axis: 'x' // this is the main dimension that is compressed by the curve
     curve,
     orientation,
     bufferGeometry: mesh.geometry,
-    axis: 'x'
 });
 ```
 
