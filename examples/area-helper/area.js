@@ -40,12 +40,13 @@ scene.add(axesHelper);
 // Instantiate OrbitControls
 const controls = new OrbitControls(camera, renderer.domElement);
 
-// Render the scene
-function animate() {
-    requestAnimationFrame(animate);
-    controls.update(); // Update the controls
+function render() {
     renderer.render(scene, camera);
 }
+
+controls.addEventListener('change', function() {
+    render();
+});
 
 // Resize //
 window.addEventListener('resize', function() {
@@ -70,12 +71,12 @@ function createTubeMeshFromCurve(curve) {
     return tubeMesh;
 }
 
-animate();
+render();
 
-let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; const arrows = [];
+let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let plane2; let sphere; let sphereHelper; const arrows = [];
 
 (async function() {
-    const material = new THREE.MeshNormalMaterial({ wireframe: true });
+    const material = new THREE.MeshNormalMaterial({ wireframe: false });
     // const materialBold = new THREE.MeshNormalMaterial({ wireframe: false });
 
     const loadGLTF = function(file) {
@@ -165,17 +166,26 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
         },
         plane1: {
             rotation: 0,
-            width: 5,
-            height: 5
+            width: 15,
+            height: 10
         },
         plane2: {
             rotation: 0,
-            width: 5,
-            height: 5
+            width: 15,
+            height: 10
         },
         rays: {
             thrown: false
-        }
+        },
+        other: {
+            hidePlanes: false,
+            hideTextHelper: true,
+            selectingPoint: false,
+            area: 'left',
+            normalRotation: 0
+        },
+        designTransformation: {},
+        sphereIntersection: {}
     };
 
     const textHelper = await (async function() {
@@ -187,7 +197,7 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
 
         return await new Promise(res => {
             gltfLoader.load(
-                'helper.gltf',
+                '/helper.gltf',
                 function(gltf) {
                     res(gltf.scene.children[0].geometry);
                 }
@@ -195,34 +205,36 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
         });
     })();
     const textHelperMesh = new THREE.Mesh(textHelper, material);
-    scene.add(textHelperMesh);
 
     redraw();
 
     // --------- GUI Sliders --------- //
     const gui = new dat.GUI();
 
-    const modelPosition = gui.addFolder('Translate Model');
-    modelPosition.open();
-    modelPosition.add(settings.model.position, 'x', -10, 10, 0.01).onChange(redraw);
-    modelPosition.add(settings.model.position, 'y', -10, 10, 0.01).onChange(redraw);
-    modelPosition.add(settings.model.position, 'z', -10, 10, 0.01).onChange(redraw);
-    const modelRotation = gui.addFolder('Rotate Model');
-    modelRotation.open();
-    modelRotation.add(settings.model.rotation, 'x', -2 * Math.PI, 2 * Math.PI, 0.01).onChange(redraw);
-    modelRotation.add(settings.model.rotation, 'y', -2 * Math.PI, 2 * Math.PI, 0.01).onChange(redraw);
-    modelRotation.add(settings.model.rotation, 'z', -2 * Math.PI, 2 * Math.PI, 0.01).onChange(redraw);
+    const otherSettings = gui.addFolder('Props');
+    otherSettings.open();
+    otherSettings.add(settings.other, 'hidePlanes').onChange(redraw);
+    otherSettings.add(settings.other, 'hideTextHelper').onChange(redraw);
+
+    // const modelPosition = gui.addFolder('Translate Jewel');
+    // modelPosition.open();
+    // modelPosition.add(settings.model.position, 'x', -10, 10, 0.01).onChange(redraw).listen();
+    // modelPosition.add(settings.model.position, 'y', -10, 10, 0.01).onChange(redraw).listen();
+    // modelPosition.add(settings.model.position, 'z', -10, 10, 0.01).onChange(redraw).listen();
+    // const modelRotation = gui.addFolder('Rotate Jewel');
+    // modelRotation.open();
+    // modelRotation.add(settings.model.rotation, 'x', -2 * Math.PI, 2 * Math.PI, 0.01).onChange(redraw).listen();
+    // modelRotation.add(settings.model.rotation, 'y', -2 * Math.PI, 2 * Math.PI, 0.01).onChange(redraw).listen();
+    // modelRotation.add(settings.model.rotation, 'z', -2 * Math.PI, 2 * Math.PI, 0.01).onChange(redraw).listen();
 
     const plane1Dimensions = gui.addFolder('Plane 1');
     plane1Dimensions.open();
-    // plane1Dimensions.add(settings.plane1, 'height', -10, 10, 0.01).onChange(redraw);
-    plane1Dimensions.add(settings.plane1, 'width', -10, 10, 0.01).onChange(redraw);
+    plane1Dimensions.add(settings.plane1, 'width', 0, 20, 0.01).onChange(redraw);
     plane1Dimensions.add(settings.plane1, 'rotation', -2 * Math.PI, 2 * Math.PI, 0.01).onChange(redraw);
 
     const plane2Dimensions = gui.addFolder('Plane 2 Dimensions');
     plane2Dimensions.open();
-    // plane2Dimensions.add(settings.plane2, 'height', -10, 10, 0.01).onChange(redraw);
-    plane2Dimensions.add(settings.plane2, 'width', -10, 10, 0.01).onChange(redraw);
+    plane2Dimensions.add(settings.plane2, 'width', 0, 20, 0.01).onChange(redraw);
     plane2Dimensions.add(settings.plane2, 'rotation', -2 * Math.PI, 2 * Math.PI, 0.01).onChange(redraw);
 
     // --------- DRAW SCENE --------- //
@@ -232,10 +244,10 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
         if (tube2) scene.remove(tube2);
         if (plane1) scene.remove(plane1);
         if (plane2) scene.remove(plane2);
-        if (area) scene.remove(area);
+        if (textHelperMesh) scene.remove(textHelperMesh);
         if (arrows.length) for (const arrow of arrows) scene.remove(arrow);
 
-        if (settings.rays.thrown === false) {
+        if (settings.other.hidePlanes === false && settings.rays.thrown === false) {
 
             // rotation planes //
             plane1 = new THREE.Mesh(new THREE.BoxGeometry(settings.plane1.width, settings.plane1.height, 0.01, 3, 3, 3), material);
@@ -293,30 +305,76 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
 
         }
 
-        // jewel //
-        if (ring) {
-            ring.position.set(settings.model.position.x, settings.model.position.y, settings.model.position.z);
-            ring.rotation.set(settings.model.rotation.x, settings.model.rotation.y, settings.model.rotation.z);
+        // moves rings
+        if (settings.designTransformation.quaternion) {
+            ring.position.set(0, 0, 0);
+            ring.rotation.set(0, 0, 0);
+            const q = settings.designTransformation.quaternion.clone();
+            const p = settings.designTransformation.point.clone();
+            ring.setRotationFromQuaternion(q);
+            const pointWithQuaterntion = p.applyQuaternion(q);
+            ring.position.set(-pointWithQuaterntion.x, -pointWithQuaterntion.y, -pointWithQuaterntion.z);
         }
 
+        // draws sphere
+        if (settings.sphereIntersection.point) {
+            if (sphere) scene.remove(sphere);
+            if (sphereHelper) scene.remove(sphereHelper);
+
+            const geometry = new THREE.SphereGeometry(0.1, 32, 16);
+            const material = new THREE.MeshBasicMaterial({ color: '#ff0000' });
+            sphere = new THREE.Mesh(geometry, material);
+
+            const point = settings.sphereIntersection.point.clone();
+            const normal = settings.sphereIntersection.normal.clone();
+            sphere.position.set(0, point.y, point.z);
+            sphereHelper = new THREE.ArrowHelper(normal, point, 1, 0xffff00);
+
+            if (settings.designTransformation.quaternion) {
+                sphere.position.set(0, 0, 0);
+                sphereHelper = new THREE.ArrowHelper(normal.clone().applyQuaternion(settings.designTransformation.quaternion), new THREE.Vector3(0, 0, 0), 1, 0xffff00);
+            }
+
+            scene.add(sphere);
+            scene.add(sphereHelper);
+        }
+
+        // draws curves
         if (settings.curve1.calced) {
             const f = new THREE.CubicBezierCurve3(settings.curve1.start, settings.curve1.c1, settings.curve1.c2, settings.curve1.end);
             tube1 = createTubeMeshFromCurve(f);
-            // createBallIndicators(settings.curve1);
             scene.add(tube1);
         }
-
         if (settings.curve2.calced) {
             const f = new THREE.CubicBezierCurve3(settings.curve2.start, settings.curve2.c1, settings.curve2.c2, settings.curve2.end);
             tube2 = createTubeMeshFromCurve(f);
-            // createBallIndicators(settings.curve2);
             scene.add(tube2);
         }
 
+        // bends text geometry //
         if (settings.curve1.calced && settings.curve2.calced) {
             bendArea();
-            scene.add(area);
         }
+        if (settings.other.hideTextHelper === false) {
+            scene.add(textHelperMesh);
+        }
+
+        render();
+    }
+
+    function updateIntersectionNormal() {
+        let normal;
+        if (settings.sphereIntersection.normalOriginal) {
+            normal = settings.sphereIntersection.normalOriginal.clone();
+        } else {
+            settings.sphereIntersection.normalOriginal = settings.sphereIntersection.normal.clone();
+            normal = settings.sphereIntersection.normal.clone();
+        }
+        const rotationMatrix = new THREE.Matrix4();
+        rotationMatrix.makeRotationX(settings.other.normalRotation);
+        normal.applyMatrix4(rotationMatrix);
+        settings.sphereIntersection.normal = normal.clone();
+        redraw();
     }
 
     function bendArea() {
@@ -324,11 +382,10 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
         flexy.bend({
             THREE,
             curve: new THREE.CubicBezierCurve3(settings.curve2.start, settings.curve2.c1, settings.curve2.c2, settings.curve2.end),
-            // orientation: settings.curve2.bendAxis === 'x' ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0),
             orientation: new THREE.Vector3(1, 0, 0),
             bufferGeometry: textHelperMesh.geometry,
             axis: 'z',
-            preserveDimensions: true,
+            preserveDimensions: false,
             scene
         });
         // then on x
@@ -338,12 +395,9 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
             orientation: new THREE.Vector3(0, 0, 1),
             bufferGeometry: textHelperMesh.geometry,
             axis: 'x',
-            preserveDimensions: true,
+            preserveDimensions: false,
             scene
         });
-        // y correction //
-        settings.curve2.correction = curveAmplitude(settings.curve2);
-        textHelperMesh.position.y += settings.curve2.correction;
     }
 
     function throwCaster() {
@@ -439,30 +493,28 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
         redraw();
     }
 
-    function curveAmplitude(data) {
-        const curve = new THREE.CubicBezierCurve3(data.start, data.c1, data.c2, data.end);
-        const line = new THREE.Line3(data.start, data.end);
-        const numPoints = 100;
-        const samplePoints = curve.getPoints(numPoints);
+    function calculationTransformations() {
+        const normal = settings.sphereIntersection.normal.clone();
+        const yAxis = new THREE.Vector3(0, 1, 0);
+        const rotationAxis = new THREE.Vector3().crossVectors(normal, yAxis).normalize();
+        const angle = Math.acos(normal.dot(yAxis));
+        const quaternion = new THREE.Quaternion().setFromAxisAngle(rotationAxis, angle);
 
-        let maxDistance = 0;
-        samplePoints.forEach(point => {
-            const closestPointOnLine = line.closestPointToPoint(point, true, new THREE.Vector3());
-            const distance = point.distanceTo(closestPointOnLine);
-            if (distance > maxDistance) {
-                maxDistance = distance;
-            }
-        });
-
-        return maxDistance;
+        settings.designTransformation.quaternion = quaternion.clone();
+        settings.designTransformation.point = settings.sphereIntersection.point.clone();
     }
 
     // --------- BUTTONS --------- //
     const btnUpload = document.createElement('button');
     btnUpload.style.position = 'absolute';
-    btnUpload.style.top = 0;
-    btnUpload.style.left = 0;
-    btnUpload.innerHTML = 'UPLOAD MODEL';
+    btnUpload.style.top = '10px';
+    btnUpload.style.left = '10px';
+    btnUpload.style.border = 0;
+    btnUpload.style.background = 'blueviolet';
+    btnUpload.style.color = 'white';
+    btnUpload.style.padding = '7px 14px';
+    btnUpload.style.cursor = 'pointer';
+    btnUpload.innerHTML = 'UPLOAD GTLF';
     btnUpload.addEventListener('click', async () => {
         document.getElementById('fileInput').click();
     });
@@ -474,37 +526,158 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
         if (file) {
             if (ring) scene.remove(ring);
             ringG = await loadGLTF(file);
+            ringGeometryCopy = ringG.clone();
             ring = new THREE.Mesh(ringG, material);
             ring.material.side = THREE.DoubleSide;
             scene.add(ring);
+            btnUpload.style.background = 'green';
+        }
+        redraw();
+    });
+
+    const areaButton = document.createElement('button');
+    areaButton.style.position = 'absolute';
+    areaButton.style.top = '50px';
+    areaButton.style.left = '10px';
+    areaButton.style.border = 0;
+    areaButton.style.background = 'blueviolet';
+    areaButton.style.color = 'white';
+    areaButton.style.padding = '7px 14px';
+    areaButton.style.cursor = 'pointer';
+    areaButton.innerHTML = 'TOGGLE LEFT OR RIGHT AREA';
+    areaButton.addEventListener('click', event => {
+        if (ring) {
+
+            // reset ring //
+            scene.remove(ring);
+            areaButton.style.background = 'green';
+            ring = new THREE.Mesh(ringGeometryCopy.clone(), material);
+            scene.add(ring);
+
+            if (settings.other.area === 'left') {
+                areaButton.innerHTML = 'RIGHT AREA';
+                ring.geometry.rotateY(-Math.PI / 2);
+                settings.other.area = 'right';
+            } else {
+                areaButton.innerHTML = 'LEFT AREA';
+                ring.geometry.rotateY(Math.PI / 2);
+                settings.other.area = 'left';
+            }
+
+            redraw();
         }
     });
+    document.body.append(areaButton);
 
-    const rightArea = document.createElement('button');
-    rightArea.style.position = 'absolute';
-    rightArea.style.top = '25px';
-    rightArea.style.left = 0;
-    rightArea.innerHTML = 'RIGHT AREA ROTATION';
-    rightArea.addEventListener('click', async () => {
-        if (textHelperMesh) textHelperMesh.rotateY(Math.PI / 2);
-    });
-    document.body.append(rightArea);
+    const btnSelectPoint = document.createElement('button');
+    btnSelectPoint.style.position = 'absolute';
+    btnSelectPoint.style.top = '90px';
+    btnSelectPoint.style.left = '10px';
+    btnSelectPoint.style.border = 0;
+    btnSelectPoint.style.background = 'blueviolet';
+    btnSelectPoint.style.color = 'white';
+    btnSelectPoint.style.padding = '7px 14px';
+    btnSelectPoint.style.cursor = 'pointer';
+    btnSelectPoint.innerHTML = 'SELECT POINT';
+    btnSelectPoint.addEventListener('click', event => {
+        if (settings.other.selectingPoint === true) {
+            settings.other.selectingPoint = false;
+            btnSelectPoint.style.background = 'blueviolet';
+            btnSelectPoint.innerHTML = 'SELECT POINT';
+            event.stopImmediatePropagation();
+        } else {
+            btnSelectPoint.style.background = 'orange';
+            settings.other.selectingPoint = true;
 
-    const leftArea = document.createElement('button');
-    leftArea.style.position = 'absolute';
-    leftArea.style.top = '50px';
-    leftArea.style.left = 0;
-    leftArea.innerHTML = 'LEFT AREA ROTATION';
-    leftArea.addEventListener('click', async () => {
-        if (textHelperMesh) textHelperMesh.rotateY(-Math.PI / 2);
+            btnSelectPoint.innerHTML = 'CLICK ON THE JEWEL';
+            event.stopImmediatePropagation();
+
+            document.body.onclick = null;
+            document.body.onclick = event => {
+                const mouse = new THREE.Vector2();
+                const raycaster = new THREE.Raycaster();
+                raycaster.firstHitOnly = true;
+
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+
+                // only target the ring //
+                const intersects = raycaster.intersectObjects(scene.children.filter(c => c.type === 'Mesh' && c.geometry.type !== 'BoxGeometry'), true); // Recursive
+
+                if (intersects.length > 0 && intersects[0].face) {
+                    settings.sphereIntersection = {
+                        point: intersects[0].point.clone(),
+                        normal: intersects[0].face.normal.clone()
+                    };
+                    otherSettings.add(settings.other, 'normalRotation', -Math.PI, Math.PI, 0.1).onChange(updateIntersectionNormal);
+                    redraw();
+                    document.body.onclick = null;
+                    btnSelectPoint.style.background = 'green';
+                    btnSelectPoint.innerHTML = 'DESIGN CENTER SELECTED';
+                    settings.other.selectingPoint = false;
+                } else {
+                    btnSelectPoint.innerHTML = 'TARGET THE STL';
+                }
+            };
+        }
     });
-    document.body.append(leftArea);
+    document.body.append(btnSelectPoint);
+
+    const btnMove = document.createElement('button');
+    btnMove.style.position = 'absolute';
+    btnMove.style.top = '130px';
+    btnMove.style.left = '10px';
+    btnMove.style.border = 0;
+    btnMove.style.background = 'blueviolet';
+    btnMove.style.color = 'white';
+    btnMove.style.padding = '7px 14px';
+    btnMove.style.cursor = 'pointer';
+    btnMove.innerHTML = 'MOVE JEWEL';
+    btnMove.addEventListener('click', () => {
+        calculationTransformations();
+        redraw();
+        btnMove.innerHTML = 'JEWEL ALIGNED WITH DESIGN';
+        btnMove.style.background = 'green';
+    });
+    document.body.append(btnMove);
+
+    const btnCasters = document.createElement('button');
+    btnCasters.style.position = 'absolute';
+    btnCasters.style.top = '170px';
+    btnCasters.style.left = '10px';
+    btnCasters.style.border = 0;
+    btnCasters.style.background = 'blueviolet';
+    btnCasters.style.color = 'white';
+    btnCasters.style.padding = '7px 14px';
+    btnCasters.style.cursor = 'pointer';
+    btnCasters.innerHTML = 'THROW RAYCASTERS';
+    btnCasters.addEventListener('click', () => {
+        if (settings.curve1.calced === false && settings.curve2.calced === false) {
+            throwCaster();
+            btnCasters.innerHTML = 'RESET';
+            btnCasters.style.background = 'green';
+        } else {
+            settings.curve1.calced = false;
+            settings.curve2.calced = false;
+            redraw();
+            btnCasters.innerHTML = 'THROW CASTERS';
+            btnCasters.style.background = 'blueviolet';
+        }
+    });
+    document.body.append(btnCasters);
 
     const btn = document.createElement('button');
     btn.style.position = 'absolute';
-    btn.style.bottom = 0;
-    btn.style.left = 0;
-    btn.innerHTML = 'PRINT CURVES';
+    btn.style.top = '210px';
+    btn.style.left = '10px';
+    btn.style.border = 0;
+    btn.style.background = 'blueviolet';
+    btn.style.color = 'white';
+    btn.style.padding = '7px 14px';
+    btn.style.cursor = 'pointer';
+    btn.innerHTML = 'PRINT BEND DATA';
     btn.addEventListener('click', () => {
         console.log(JSON.stringify([
             {
@@ -566,22 +739,4 @@ let tube1; let tube2; let ring; let ringG; let area; let plane1; let plane2; con
         ]));
     });
     document.body.append(btn);
-
-    const btnCasters = document.createElement('button');
-    btnCasters.style.position = 'absolute';
-    btnCasters.style.bottom = 0;
-    btnCasters.style.right = 0;
-    btnCasters.innerHTML = 'THROW RAYCASTERS';
-    btnCasters.addEventListener('click', () => {
-        if (settings.curve1.calced === false && settings.curve2.calced === false) {
-            throwCaster();
-            btnCasters.innerHTML = 'RESET';
-        } else {
-            settings.curve1.calced = false;
-            settings.curve2.calced = false;
-            redraw();
-            btnCasters.innerHTML = 'THROW CASTERS';
-        }
-    });
-    document.body.append(btnCasters);
 })();
