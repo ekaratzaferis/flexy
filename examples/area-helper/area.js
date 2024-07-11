@@ -1,6 +1,6 @@
 import * as THREE from 'three';
+import fitCurve from 'fit-curve';
 import * as flexy from '../../flexy';
-import * as fitCurve from 'fit-curve';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
