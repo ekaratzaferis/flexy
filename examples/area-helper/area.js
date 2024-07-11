@@ -197,7 +197,7 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
 
         return await new Promise(res => {
             gltfLoader.load(
-                '/helper.gltf',
+                './helper.gltf',
                 function(gltf) {
                     res(gltf.scene.children[0].geometry);
                 }
