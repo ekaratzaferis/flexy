@@ -73,7 +73,7 @@ function createTubeMeshFromCurve(curve) {
 
 render();
 
-let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let plane2; let sphere; let sphereHelper; const arrows = [];
+let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; let sphereHelper; const arrows = [];
 
 (async function() {
     const material = new THREE.MeshNormalMaterial({ wireframe: false });
@@ -181,7 +181,6 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
             hidePlanes: false,
             hideTextHelper: true,
             selectingPoint: false,
-            area: 'left',
             normalRotation: 0
         },
         designTransformation: {},
@@ -327,7 +326,7 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
 
             const point = settings.sphereIntersection.point.clone();
             const normal = settings.sphereIntersection.normal.clone();
-            sphere.position.set(0, point.y, point.z);
+            sphere.position.set(point.x, point.y, 0);
             sphereHelper = new THREE.ArrowHelper(normal, point, 1, 0xffff00);
 
             if (settings.designTransformation.quaternion) {
@@ -371,7 +370,7 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
             normal = settings.sphereIntersection.normal.clone();
         }
         const rotationMatrix = new THREE.Matrix4();
-        rotationMatrix.makeRotationX(settings.other.normalRotation);
+        rotationMatrix.makeRotationZ(settings.other.normalRotation);
         normal.applyMatrix4(rotationMatrix);
         settings.sphereIntersection.normal = normal.clone();
         redraw();
@@ -494,6 +493,7 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
     }
 
     function calculationTransformations() {
+
         const normal = settings.sphereIntersection.normal.clone();
         const yAxis = new THREE.Vector3(0, 1, 0);
         const rotationAxis = new THREE.Vector3().crossVectors(normal, yAxis).normalize();
@@ -502,6 +502,11 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
 
         settings.designTransformation.quaternion = quaternion.clone();
         settings.designTransformation.point = settings.sphereIntersection.point.clone();
+
+        settings.designTransformation.dataJSON = {
+            position: settings.designTransformation.point.clone(),
+            normal: settings.sphereIntersection.normal.clone()
+        };
     }
 
     // --------- BUTTONS --------- //
@@ -526,7 +531,6 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
         if (file) {
             if (ring) scene.remove(ring);
             ringG = await loadGLTF(file);
-            ringGeometryCopy = ringG.clone();
             ring = new THREE.Mesh(ringG, material);
             ring.material.side = THREE.DoubleSide;
             scene.add(ring);
@@ -535,43 +539,9 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
         redraw();
     });
 
-    const areaButton = document.createElement('button');
-    areaButton.style.position = 'absolute';
-    areaButton.style.top = '50px';
-    areaButton.style.left = '10px';
-    areaButton.style.border = 0;
-    areaButton.style.background = 'blueviolet';
-    areaButton.style.color = 'white';
-    areaButton.style.padding = '7px 14px';
-    areaButton.style.cursor = 'pointer';
-    areaButton.innerHTML = 'TOGGLE LEFT OR RIGHT AREA';
-    areaButton.addEventListener('click', event => {
-        if (ring) {
-
-            // reset ring //
-            scene.remove(ring);
-            areaButton.style.background = 'green';
-            ring = new THREE.Mesh(ringGeometryCopy.clone(), material);
-            scene.add(ring);
-
-            if (settings.other.area === 'left') {
-                areaButton.innerHTML = 'RIGHT AREA';
-                ring.geometry.rotateY(-Math.PI / 2);
-                settings.other.area = 'right';
-            } else {
-                areaButton.innerHTML = 'LEFT AREA';
-                ring.geometry.rotateY(Math.PI / 2);
-                settings.other.area = 'left';
-            }
-
-            redraw();
-        }
-    });
-    document.body.append(areaButton);
-
     const btnSelectPoint = document.createElement('button');
     btnSelectPoint.style.position = 'absolute';
-    btnSelectPoint.style.top = '90px';
+    btnSelectPoint.style.top = '50px';
     btnSelectPoint.style.left = '10px';
     btnSelectPoint.style.border = 0;
     btnSelectPoint.style.background = 'blueviolet';
@@ -627,7 +597,7 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
 
     const btnMove = document.createElement('button');
     btnMove.style.position = 'absolute';
-    btnMove.style.top = '130px';
+    btnMove.style.top = '90px';
     btnMove.style.left = '10px';
     btnMove.style.border = 0;
     btnMove.style.background = 'blueviolet';
@@ -645,7 +615,7 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
 
     const btnCasters = document.createElement('button');
     btnCasters.style.position = 'absolute';
-    btnCasters.style.top = '170px';
+    btnCasters.style.top = '130px';
     btnCasters.style.left = '10px';
     btnCasters.style.border = 0;
     btnCasters.style.background = 'blueviolet';
@@ -670,7 +640,7 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
 
     const btn = document.createElement('button');
     btn.style.position = 'absolute';
-    btn.style.top = '210px';
+    btn.style.top = '170px';
     btn.style.left = '10px';
     btn.style.border = 0;
     btn.style.background = 'blueviolet';
@@ -679,10 +649,22 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
     btn.style.cursor = 'pointer';
     btn.innerHTML = 'PRINT BEND DATA';
     btn.addEventListener('click', () => {
-        console.log(JSON.stringify([
+        const data = JSON.stringify([
             {
                 'flexy': true,
                 'axis': 'z',
+                'transformation': {
+                    'position': {
+                        'x': settings.designTransformation.dataJSON.position.x,
+                        'y': settings.designTransformation.dataJSON.position.y,
+                        'z': settings.designTransformation.dataJSON.position.z
+                    },
+                    'normal': {
+                        'x': settings.designTransformation.dataJSON.normal.x,
+                        'y': settings.designTransformation.dataJSON.normal.y,
+                        'z': settings.designTransformation.dataJSON.normal.z
+                    }
+                },
                 'curveParts': [
                     {
                         'startPoint': {
@@ -711,6 +693,18 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
             {
                 'flexy': true,
                 'axis': 'x',
+                'transformation': {
+                    'position': {
+                        'x': settings.designTransformation.dataJSON.position.x,
+                        'y': settings.designTransformation.dataJSON.position.y,
+                        'z': settings.designTransformation.dataJSON.position.z
+                    },
+                    'normal': {
+                        'x': settings.designTransformation.dataJSON.normal.x,
+                        'y': settings.designTransformation.dataJSON.normal.y,
+                        'z': settings.designTransformation.dataJSON.normal.z
+                    }
+                },
                 'curveParts': [
                     {
                         'startPoint': {
@@ -736,7 +730,10 @@ let tube1; let tube2; let ring; let ringGeometryCopy; let ringG; let plane1; let
                     }
                 ]
             }
-        ]));
+        ]);
+        console.log(data);
+        navigator.clipboard.writeText(data);
+        btn.innerHTML = 'COPIED!';
     });
     document.body.append(btn);
 })();
