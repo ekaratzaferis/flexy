@@ -73,7 +73,7 @@ function createTubeMeshFromCurve(curve) {
 
 render();
 
-let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; let sphereHelper; const arrows = [];
+let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; let oldDesignCenter; let sphereHelper; const arrows = [];
 
 (async function() {
     const material = new THREE.MeshNormalMaterial({ wireframe: false });
@@ -184,7 +184,8 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
             normalRotation: 0
         },
         designTransformation: {},
-        sphereIntersection: {}
+        sphereIntersection: {},
+        oldDesignCenterData: {}
     };
 
     const textHelper = await (async function() {
@@ -336,6 +337,20 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
 
             scene.add(sphere);
             scene.add(sphereHelper);
+        }
+
+        // draws old center
+        if (settings.oldDesignCenterData.point) {
+            if (oldDesignCenter) scene.remove(oldDesignCenter);
+
+            const geometry = new THREE.SphereGeometry(0.1, 32, 16);
+            const material = new THREE.MeshBasicMaterial({ color: '#00ff00' });
+            oldDesignCenter = new THREE.Mesh(geometry, material);
+
+            const point = settings.oldDesignCenterData.point.clone();
+            oldDesignCenter.position.set(point.x, point.y, 0);
+
+            scene.add(oldDesignCenter);
         }
 
         // draws curves
@@ -649,7 +664,7 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
     btn.style.cursor = 'pointer';
     btn.innerHTML = 'PRINT BEND DATA';
     btn.addEventListener('click', () => {
-        const data = JSON.stringify([
+        const rightArea = [
             {
                 'flexy': true,
                 'axis': 'z',
@@ -657,12 +672,12 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
                     'position': {
                         'x': settings.designTransformation.dataJSON.position.x,
                         'y': settings.designTransformation.dataJSON.position.y,
-                        'z': settings.designTransformation.dataJSON.position.z
+                        'z': 0
                     },
                     'normal': {
                         'x': settings.designTransformation.dataJSON.normal.x,
                         'y': settings.designTransformation.dataJSON.normal.y,
-                        'z': settings.designTransformation.dataJSON.normal.z
+                        'z': 0
                     }
                 },
                 'curveParts': [
@@ -730,10 +745,72 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
                     }
                 ]
             }
-        ]);
-        console.log(data);
-        navigator.clipboard.writeText(data);
+        ];
+        const xAxisBend = rightArea.find(b => b.axis === 'x');
+        const zAxisBend = rightArea.find(b => b.axis === 'z');
+
+        const leftArea = JSON.parse(JSON.stringify(rightArea));
+
+        for (let i = 0; i < leftArea.length; i++) {
+            if (leftArea[i].axis === 'x') {
+                leftArea[i].transformation.position.x = -xAxisBend.transformation.position.x;
+                leftArea[i].transformation.normal.x = -xAxisBend.transformation.normal.x;
+            }
+            if (leftArea[i].axis === 'z') {
+                leftArea[i].transformation.position.x = -zAxisBend.transformation.position.x;
+                leftArea[i].transformation.normal.x = -zAxisBend.transformation.normal.x;
+            }
+        }
+
+        console.log('DATA FOR LEFT AREA');
+        console.log(JSON.stringify(leftArea));
+        console.log('DATA FOR RIGHT AREA');
+        console.log(JSON.stringify(rightArea));
         btn.innerHTML = 'COPIED!';
     });
     document.body.append(btn);
+
+    const loadExistingData = document.createElement('button');
+    loadExistingData.style.position = 'absolute';
+    loadExistingData.style.bottom = '50px';
+    loadExistingData.style.left = '10px';
+    loadExistingData.style.border = 0;
+    loadExistingData.style.background = 'blueviolet';
+    loadExistingData.style.color = 'white';
+    loadExistingData.style.padding = '7px 14px';
+    loadExistingData.style.cursor = 'pointer';
+    loadExistingData.innerHTML = 'LOAD DATA JSON';
+    loadExistingData.addEventListener('click', () => {
+        const data = JSON.parse(prompt('COPY & PASTE'));
+        const designCenter = new THREE.Vector3(data[0].transformation.position.x, data[0].transformation.position.y, data[0].transformation.position.z);
+        settings.oldDesignCenterData.point = designCenter;
+        redraw();
+    });
+    document.body.append(loadExistingData);
+
+    const mirrorOldCenter = document.createElement('button');
+    mirrorOldCenter.style.position = 'absolute';
+    mirrorOldCenter.style.bottom = '10px';
+    mirrorOldCenter.style.left = '10px';
+    mirrorOldCenter.style.border = 0;
+    mirrorOldCenter.style.background = 'blueviolet';
+    mirrorOldCenter.style.color = 'white';
+    mirrorOldCenter.style.padding = '7px 14px';
+    mirrorOldCenter.style.cursor = 'pointer';
+    mirrorOldCenter.innerHTML = 'MIRROR TO THE OTHER SIDE';
+    mirrorOldCenter.addEventListener('click', () => {
+        if (settings.oldDesignCenterData.point) {
+            const newPoint = new THREE.Vector3(-settings.oldDesignCenterData.point.x, settings.oldDesignCenterData.point.y, settings.oldDesignCenterData.point.z);
+            settings.oldDesignCenterData.point = newPoint.clone();
+            redraw();
+        } else {
+            mirrorOldCenter.innerHTML = 'LOAD JSON DATA FIRST';
+            mirrorOldCenter.style.background = 'red';
+            setTimeout(() => {
+                mirrorOldCenter.innerHTML = 'MIRROR TO THE OTHER SIDE';
+                mirrorOldCenter.style.background = 'blueviolet';
+            }, 1500);
+        }
+    });
+    document.body.append(mirrorOldCenter);
 })();

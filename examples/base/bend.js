@@ -69,7 +69,7 @@ const generate3dArc = ({
     const controlPoint1 = new THREE.Vector3(arcR * 0.55, arcR, 0).applyAxisAngle(rotationVector, rotation);
     const controlPoint2 = new THREE.Vector3(arcR, arcR * 0.45, 0).applyAxisAngle(rotationVector, rotation);
     const endPoint = new THREE.Vector3(arcR, 0, arcR).applyAxisAngle(rotationVector, rotation);
-    const final = new THREE.CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
+    const final = new THREE.CubicBezierCurve3(endPoint, controlPoint2, controlPoint1, startPoint); // draw ltr
     return {
         curve: final,
         rotationVector
@@ -84,7 +84,7 @@ const generateArc = ({
     const controlPoint1 = new THREE.Vector3(arcR / 4, arcR / 2, 0).applyAxisAngle(rotationVector, rotation);
     const controlPoint2 = new THREE.Vector3(-arcR / 4, arcR / 2, 0).applyAxisAngle(rotationVector, rotation);
     const endPoint = new THREE.Vector3(-arcR, arcR / 8, 0).applyAxisAngle(rotationVector, rotation);
-    const final = new THREE.CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
+    const final = new THREE.CubicBezierCurve3(endPoint, controlPoint2, controlPoint1, startPoint); // draw ltr
     return {
         curve: final,
         rotationVector
@@ -99,25 +99,25 @@ const generateEllipticalCurve = ({
     let controlPoint1 = new THREE.Vector3(ellipseA, ellipseB * 0.45, 0).applyAxisAngle(rotationVector, rotation);
     let controlPoint2 = new THREE.Vector3(ellipseA * 0.55, ellipseB, 0).applyAxisAngle(rotationVector, rotation);
     let endPoint = new THREE.Vector3(0, ellipseB, 0).applyAxisAngle(rotationVector, rotation);
-    const curve1 = new THREE.CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
+    const curve1 = new THREE.CubicBezierCurve3(endPoint, controlPoint2, controlPoint1, startPoint); // draw ltr
 
     startPoint = new THREE.Vector3(0, ellipseB, 0).applyAxisAngle(rotationVector, rotation);
     controlPoint1 = new THREE.Vector3(-ellipseA * 0.45, ellipseB, 0).applyAxisAngle(rotationVector, rotation);
     controlPoint2 = new THREE.Vector3(-ellipseA, ellipseB * 0.55, 0).applyAxisAngle(rotationVector, rotation);
     endPoint = new THREE.Vector3(-ellipseA, 0, 0).applyAxisAngle(rotationVector, rotation);
-    const curve2 = new THREE.CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
+    const curve2 = new THREE.CubicBezierCurve3(endPoint, controlPoint2, controlPoint1, startPoint); // draw ltr
 
     startPoint = new THREE.Vector3(-ellipseA, 0, 0).applyAxisAngle(rotationVector, rotation);
     controlPoint1 = new THREE.Vector3(-ellipseA, -ellipseB * 0.45, 0).applyAxisAngle(rotationVector, rotation);
     controlPoint2 = new THREE.Vector3(-ellipseA * 0.55, -ellipseB, 0).applyAxisAngle(rotationVector, rotation);
     endPoint = new THREE.Vector3(0, -ellipseB, 0).applyAxisAngle(rotationVector, rotation);
-    const curve3 = new THREE.CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
+    const curve3 = new THREE.CubicBezierCurve3(endPoint, controlPoint2, controlPoint1, startPoint); // draw ltr
 
     startPoint = new THREE.Vector3(0, -ellipseB, 0).applyAxisAngle(rotationVector, rotation);
     controlPoint1 = new THREE.Vector3(ellipseA * 0.45, -ellipseB, 0).applyAxisAngle(rotationVector, rotation);
     controlPoint2 = new THREE.Vector3(ellipseA, -ellipseB * 0.55, 0).applyAxisAngle(rotationVector, rotation);
     endPoint = new THREE.Vector3(ellipseA, 0, 0).applyAxisAngle(rotationVector, rotation);
-    const curve4 = new THREE.CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
+    const curve4 = new THREE.CubicBezierCurve3(endPoint, controlPoint2, controlPoint1, startPoint); // draw ltr
 
     const final = new THREE.CurvePath();
     final.add(curve1);
@@ -139,7 +139,7 @@ const generateSineCurve = ({
     const controlPoint1 = new THREE.Vector3(Math.ceil((-sineX0 + sineX1) * (1 / 3)), sineAmplitude, 0).applyAxisAngle(rotationVector, rotation);
     const controlPoint2 = new THREE.Vector3(Math.ceil((-sineX0 + sineX1) * (1 / 3)), -sineAmplitude, 0).applyAxisAngle(rotationVector, rotation);
     const endPoint = new THREE.Vector3(sineX1, 0, 0).applyAxisAngle(rotationVector, rotation);
-    const final = new THREE.CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
+    const final = new THREE.CubicBezierCurve3(endPoint, controlPoint2, controlPoint1, startPoint); // draw ltr
 
     return {
         curve: final,
@@ -150,7 +150,7 @@ const generateSineCurve = ({
 function createExampleMesh({
     width, height, depth, widthSegments, heightSegments, depthSegments, wireframe
 }) {
-    const geometry = new THREE.BoxGeometry(width, height, depth, widthSegments, heightSegments, depthSegments);
+    const geometry = new THREE.BoxGeometry(width, height, depth * 3, widthSegments, heightSegments, depthSegments);
     let material;
     if (wireframe) {
         material = new THREE.MeshNormalMaterial({ wireframe: true });
@@ -231,6 +231,21 @@ function updateGeometry() {
 
     }
 
+    const cloneG = mesh.geometry.clone();
+    const material = [];
+    material.push( new THREE.MeshBasicMaterial( { color: 0xff3333 } ) );
+    material.push( new THREE.MeshBasicMaterial( { color: 0xff8800 } ) );
+    material.push( new THREE.MeshBasicMaterial( { color: 0xffff33 } ) );
+    material.push( new THREE.MeshBasicMaterial( { color: 0x33ff33 } ) );
+    material.push( new THREE.MeshBasicMaterial( { color: 0x3333ff } ) );
+    material.push( new THREE.MeshBasicMaterial( { color: 0x8833ff } ) );
+    const meshG = new THREE.Mesh(cloneG, material);
+    meshG.position.z += 9;
+    scene.add(meshG);
+
+    mesh.geometry.rotateY(-0.3);
+    meshG.geometry.rotateY(-0.3);
+
     flexy.bend({
         THREE,
         curve,
@@ -260,7 +275,7 @@ const settings = {
         preserveDimensions: false
     },
     firstCurve: {
-        type: '3d_arc',
+        type: 'arc',
         rotation: 0,
         arcR: 10,
         ellipseA: 15,
