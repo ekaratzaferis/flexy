@@ -93,7 +93,10 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
                 gltfLoader.parse(
                     reader.result,
                     '',
-                    gltf => resolve(gltf.scene.children[2].geometry)
+                    gltf => {
+                        resolve(gltf.scene.children.find(c => c.name === 'jewel').geometry);
+                        // resolve(gltf.scene.children[2].geometry);
+                    }
                 );
             };
 
