@@ -316,8 +316,7 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
             const p = settings.designTransformation.point.clone();
             ring.setRotationFromQuaternion(q);
             const pointWithQuaterntion = p.applyQuaternion(q);
-            // ring.position.set(-pointWithQuaterntion.x, -pointWithQuaterntion.y, -pointWithQuaterntion.z);
-            ring.position.set(-pointWithQuaterntion.x, -pointWithQuaterntion.y, 0);
+            ring.position.set(-pointWithQuaterntion.x, -pointWithQuaterntion.y, -pointWithQuaterntion.z);
         }
 
         // draws sphere
@@ -600,6 +599,11 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
                         point: intersects[0].point.clone(),
                         normal: intersects[0].face.normal.clone()
                     };
+
+                    settings.sphereIntersection.point.z = 0;
+                    settings.sphereIntersection.normal.z = 0;
+                    settings.sphereIntersection.normal.normalize();
+
                     otherSettings.add(settings.other, 'normalRotation', -Math.PI, Math.PI, 0.1).onChange(updateIntersectionNormal);
                     redraw();
                     document.body.onclick = null;
@@ -716,12 +720,12 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
                     'position': {
                         'x': settings.designTransformation.dataJSON.position.x,
                         'y': settings.designTransformation.dataJSON.position.y,
-                        'z': settings.designTransformation.dataJSON.position.z
+                        'z': 0
                     },
                     'normal': {
                         'x': settings.designTransformation.dataJSON.normal.x,
                         'y': settings.designTransformation.dataJSON.normal.y,
-                        'z': settings.designTransformation.dataJSON.normal.z
+                        'z': 0
                     }
                 },
                 'curveParts': [
