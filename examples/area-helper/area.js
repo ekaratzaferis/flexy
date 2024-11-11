@@ -592,7 +592,7 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
                 raycaster.setFromCamera(mouse, camera);
 
                 // only target the ring //
-                const intersects = raycaster.intersectObjects(scene.children.filter(c => c.type === 'Mesh' && c.geometry.type !== 'BoxGeometry'), true); // Recursive
+                const intersects = raycaster.intersectObjects(scene.children.filter(c => c.type === 'Mesh' && c.geometry.type !== 'BoxGeometry' && c.geometry.type !== 'SphereGeometry'), true); // Recursive
 
                 if (intersects.length > 0 && intersects[0].face) {
                     settings.sphereIntersection = {
