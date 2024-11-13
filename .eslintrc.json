@@ -48,7 +48,7 @@
       "multi-line"
     ],
     "eqeqeq": "error",
-    "no-alert": "error",
+    "no-alert": "off",
     "no-caller": "error",
     "no-case-declarations": "error",
     "no-empty-function": "off",

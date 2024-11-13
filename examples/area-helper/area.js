@@ -94,8 +94,15 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
                     reader.result,
                     '',
                     gltf => {
-                        resolve(gltf.scene.children.find(c => c.name === 'jewel').geometry);
-                        // resolve(gltf.scene.children[2].geometry);
+                        console.log(gltf.scene.children);
+                        const obj = gltf.scene.children.find(c => c.name === 'jewel');
+                        if (obj) resolve(obj.geometry);
+                        else {
+                            const childName = prompt(`Select object from GLTF: ${gltf.scene.children.reduce((acc, child) => {
+                                return acc + (acc ? ', ' : '') + child.name;
+                            }, '')}`);
+                            resolve(gltf.scene.children.find(c => c.name === childName).geometry);
+                        }
                     }
                 );
             };
@@ -770,10 +777,28 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
             }
         }
 
-        console.log('DATA FOR LEFT AREA');
+        console.log('BEND DATA FOR LEFT AREA');
         console.log(JSON.stringify(leftArea));
-        console.log('DATA FOR RIGHT AREA');
+        console.log('DIMENSION DATA FOR LEFT AREA');
+        console.log(JSON.stringify({
+            'boundingBox': {
+                'dimX': settings.plane1.width,
+                'dimZ': settings.plane2.width,
+                'type': 'square'
+            },
+            'inscribedShape': {}
+        }));
+        console.log('BEND DATA FOR RIGHT AREA');
         console.log(JSON.stringify(rightArea));
+        console.log('DIMENSION DATA FOR RIGHT AREA');
+        console.log(JSON.stringify({
+            'boundingBox': {
+                'dimX': settings.plane1.width,
+                'dimZ': settings.plane2.width,
+                'type': 'square'
+            },
+            'inscribedShape': {}
+        }));
         btn.innerHTML = 'COPIED!';
     });
     document.body.append(btn);
