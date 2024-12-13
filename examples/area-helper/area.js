@@ -367,11 +367,13 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
         if (settings.curve1.calced) {
             const f = new THREE.CubicBezierCurve3(settings.curve1.start, settings.curve1.c1, settings.curve1.c2, settings.curve1.end);
             tube1 = createTubeMeshFromCurve(f);
+            settings.curve1.curveLength = f.getLength();
             scene.add(tube1);
         }
         if (settings.curve2.calced) {
             const f = new THREE.CubicBezierCurve3(settings.curve2.start, settings.curve2.c1, settings.curve2.c2, settings.curve2.end);
             tube2 = createTubeMeshFromCurve(f);
+            settings.curve2.curveLength = f.getLength();
             scene.add(tube2);
         }
 
@@ -782,8 +784,8 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
         console.log('DIMENSION DATA FOR LEFT AREA');
         console.log(JSON.stringify({
             'boundingBox': {
-                'dimX': settings.plane1.width,
-                'dimZ': settings.plane2.width,
+                'dimX': settings.curve1.curveLength,
+                'dimZ': settings.curve2.curveLength,
                 'type': 'square'
             },
             'inscribedShape': {}
@@ -793,8 +795,8 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
         console.log('DIMENSION DATA FOR RIGHT AREA');
         console.log(JSON.stringify({
             'boundingBox': {
-                'dimX': settings.plane1.width,
-                'dimZ': settings.plane2.width,
+                'dimX': settings.curve1.curveLength,
+                'dimZ': settings.curve2.curveLength,
                 'type': 'square'
             },
             'inscribedShape': {}
