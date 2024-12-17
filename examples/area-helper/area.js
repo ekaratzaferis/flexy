@@ -786,7 +786,6 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
             'boundingBox': {
                 'dimX': settings.curve1.curveLength,
                 'dimZ': settings.curve2.curveLength,
-                'trueDimensions': true,
                 'type': 'square'
             },
             'inscribedShape': {}
@@ -798,7 +797,6 @@ let tube1; let tube2; let ring; let ringG; let plane1; let plane2; let sphere; l
             'boundingBox': {
                 'dimX': settings.curve1.curveLength,
                 'dimZ': settings.curve2.curveLength,
-                'trueDimensions': true,
                 'type': 'square'
             },
             'inscribedShape': {}
