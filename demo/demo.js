@@ -59,6 +59,16 @@ const state = {
     curvePlane: 'xy',
 };
 
+const wrapState = {
+    torusRadius: 5,
+    tubeRadius: 1.5,
+    planeW: 16,
+    planeH: 16,
+    resolution: 24,
+    showSourcePlane: true,
+    showWrappedPlane: true,
+};
+
 // ════════════════════════════════════════════════════════
 // DRAW CANVAS
 // ════════════════════════════════════════════════════════
@@ -308,7 +318,7 @@ function buildGeometry() {
 }
 
 // ════════════════════════════════════════════════════════
-// SCENE UPDATE
+// SCENE UPDATE — BEND
 // ════════════════════════════════════════════════════════
 
 let sceneObjects = [];
@@ -359,7 +369,124 @@ function update() {
 }
 
 // ════════════════════════════════════════════════════════
-// UI BINDINGS
+// SCENE UPDATE — WRAP
+// ════════════════════════════════════════════════════════
+
+// Local helpers that mirror flexy.js internals so we can pre-fill missing map
+// entries for vertices that don't intersect the torus (hole / outer region).
+// Without this, flexy.wrap() would throw on the first missed vertex and abort.
+
+function _lerpPts(a, b, n) {
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+        pts.push(new THREE.Vector3(
+            a.x + (b.x - a.x) * (i / n),
+            a.y + (b.y - a.y) * (i / n),
+            a.z + (b.z - a.z) * (i / n)
+        ));
+    }
+    return pts;
+}
+
+function _gridKey(x, y, z, resolution) {
+    const step = 1 / resolution;
+    const r = v => {
+        const s = (Math.round(v / step) * step).toFixed(1);
+        return s === '-0.0' ? '0.0' : s;
+    };
+    return `${r(x)}^${r(y)}^${r(z)}`;
+}
+
+function updateWrap() {
+    clearDynamic();
+
+    const { torusRadius, tubeRadius, planeW, planeH, resolution, showSourcePlane, showWrappedPlane } = wrapState;
+
+    // ── Torus ──────────────────────────────────────────
+    const torusMesh = new THREE.Mesh(
+        new THREE.TorusGeometry(torusRadius, tubeRadius, 32, 100),
+        new THREE.MeshNormalMaterial()
+    );
+    torusMesh.rotation.x = Math.PI / 2;
+    scene.add(torusMesh);
+    torusMesh.updateMatrixWorld(true);
+    sceneObjects.push(torusMesh);
+
+    // ── Casting rectangle (corners must match plane bounds exactly) ──
+    const A = new THREE.Vector3(-planeW / 2, 20,  planeH / 2);
+    const B = new THREE.Vector3( planeW / 2, 20,  planeH / 2);
+    const C = new THREE.Vector3( planeW / 2, 20, -planeH / 2);
+    const D = new THREE.Vector3(-planeW / 2, 20, -planeH / 2);
+    const castingRectangular = { A, B, C, D, direction: new THREE.Vector3(0, -1, 0) };
+
+    const map = flexy.getPointToFaceNormalMap({ THREE, surface: torusMesh, castingRectangular, resolution });
+
+    // Pre-fill map entries that the raycaster missed (torus hole / outer area).
+    // Vertices landing here receive the default normal (0,0,-1), which produces
+    // an identity-like quaternion via Object3D.lookAt, leaving them undeformed.
+    const defaultNormal = { x: 0, y: 0, z: -1 };
+    const colStarts = _lerpPts(A, D, resolution);
+    const colEnds   = _lerpPts(B, C, resolution);
+    for (let i = 0; i <= resolution; i++) {
+        for (const pt of _lerpPts(colStarts[i], colEnds[i], resolution)) {
+            const key = _gridKey(pt.x, pt.y, pt.z, resolution);
+            if (!map.data[key]) {
+                map.data[key] = { normal: defaultNormal, point: { x: pt.x, y: pt.y, z: pt.z } };
+            }
+        }
+    }
+
+    // ── Source plane (display only) ────────────────────
+    if (showSourcePlane) {
+        const srcMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(planeW, planeH, resolution, resolution),
+            new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true, transparent: true, opacity: 0.4 })
+        );
+        srcMesh.rotation.x = Math.PI / 2;
+        srcMesh.position.y = 20;
+        scene.add(srcMesh);
+        sceneObjects.push(srcMesh);
+    }
+
+    // ── Wrap target ────────────────────────────────────
+    const wrapTarget = new THREE.Mesh(
+        new THREE.PlaneGeometry(planeW, planeH, resolution, resolution),
+        new THREE.MeshNormalMaterial()
+    );
+    wrapTarget.rotation.x = Math.PI / 2;
+    wrapTarget.position.y = 20;
+    scene.add(wrapTarget);
+    wrapTarget.updateMatrixWorld(true);
+    sceneObjects.push(wrapTarget);
+
+    flexy.wrap({ THREE, pointToFaceNormalMap: map, obj: wrapTarget });
+    wrapTarget.geometry.computeVertexNormals();
+    wrapTarget.visible = showWrappedPlane;
+}
+
+// ════════════════════════════════════════════════════════
+// MODE TOGGLE
+// ════════════════════════════════════════════════════════
+
+let currentMode = 'bend';
+
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (btn.dataset.mode === currentMode) return;
+        currentMode = btn.dataset.mode;
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.body.dataset.mode = currentMode;
+        if (currentMode === 'wrap') {
+            updateWrap();
+        } else {
+            update();
+        }
+    });
+});
+
+// ════════════════════════════════════════════════════════
+// UI BINDINGS — BEND
 // ════════════════════════════════════════════════════════
 
 // Geometry selector
@@ -400,6 +527,36 @@ document.getElementById('tog-preserve').addEventListener('change', (e) => {
 document.getElementById('tog-wireframe').addEventListener('change', (e) => {
     state.wireframe = e.target.checked;
     update();
+});
+
+// ════════════════════════════════════════════════════════
+// UI BINDINGS — WRAP
+// ════════════════════════════════════════════════════════
+
+function bindWrapSlider(sliderId, valId, stateKey, decimals) {
+    const slider = document.getElementById(sliderId);
+    const valEl  = document.getElementById(valId);
+    slider.addEventListener('input', () => {
+        wrapState[stateKey] = parseFloat(slider.value);
+        valEl.textContent = parseFloat(slider.value).toFixed(decimals);
+        updateWrap();
+    });
+}
+
+bindWrapSlider('sl-torus-radius', 'val-torus-radius', 'torusRadius', 1);
+bindWrapSlider('sl-tube-radius',  'val-tube-radius',  'tubeRadius',  1);
+bindWrapSlider('sl-wrap-w',       'val-wrap-w',       'planeW',      0);
+bindWrapSlider('sl-wrap-h',       'val-wrap-h',       'planeH',      0);
+bindWrapSlider('sl-wrap-res',     'val-wrap-res',     'resolution',  0);
+
+document.getElementById('tog-source-plane').addEventListener('change', (e) => {
+    wrapState.showSourcePlane = e.target.checked;
+    updateWrap();
+});
+
+document.getElementById('tog-wrap-plane').addEventListener('change', (e) => {
+    wrapState.showWrappedPlane = e.target.checked;
+    updateWrap();
 });
 
 // ════════════════════════════════════════════════════════
