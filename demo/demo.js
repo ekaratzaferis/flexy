@@ -372,31 +372,6 @@ function update() {
 // SCENE UPDATE — WRAP
 // ════════════════════════════════════════════════════════
 
-// Local helpers that mirror flexy.js internals so we can pre-fill missing map
-// entries for vertices that don't intersect the torus (hole / outer region).
-// Without this, flexy.wrap() would throw on the first missed vertex and abort.
-
-function _lerpPts(a, b, n) {
-    const pts = [];
-    for (let i = 0; i <= n; i++) {
-        pts.push(new THREE.Vector3(
-            a.x + (b.x - a.x) * (i / n),
-            a.y + (b.y - a.y) * (i / n),
-            a.z + (b.z - a.z) * (i / n)
-        ));
-    }
-    return pts;
-}
-
-function _gridKey(x, y, z, resolution) {
-    const step = 1 / resolution;
-    const r = v => {
-        const s = (Math.round(v / step) * step).toFixed(1);
-        return s === '-0.0' ? '0.0' : s;
-    };
-    return `${r(x)}^${r(y)}^${r(z)}`;
-}
-
 function updateWrap() {
     clearDynamic();
 
@@ -413,28 +388,15 @@ function updateWrap() {
     sceneObjects.push(torusMesh);
 
     // ── Casting rectangle (corners must match plane bounds exactly) ──
-    const A = new THREE.Vector3(-planeW / 2, 20,  planeH / 2);
-    const B = new THREE.Vector3( planeW / 2, 20,  planeH / 2);
-    const C = new THREE.Vector3( planeW / 2, 20, -planeH / 2);
-    const D = new THREE.Vector3(-planeW / 2, 20, -planeH / 2);
-    const castingRectangular = { A, B, C, D, direction: new THREE.Vector3(0, -1, 0) };
+    const castingRectangular = {
+        A: new THREE.Vector3(-planeW / 2, 20,  planeH / 2),
+        B: new THREE.Vector3( planeW / 2, 20,  planeH / 2),
+        C: new THREE.Vector3( planeW / 2, 20, -planeH / 2),
+        D: new THREE.Vector3(-planeW / 2, 20, -planeH / 2),
+        direction: new THREE.Vector3(0, -1, 0),
+    };
 
     const map = flexy.getPointToFaceNormalMap({ THREE, surface: torusMesh, castingRectangular, resolution });
-
-    // Pre-fill map entries that the raycaster missed (torus hole / outer area).
-    // Vertices landing here receive the default normal (0,0,-1), which produces
-    // an identity-like quaternion via Object3D.lookAt, leaving them undeformed.
-    const defaultNormal = { x: 0, y: 0, z: -1 };
-    const colStarts = _lerpPts(A, D, resolution);
-    const colEnds   = _lerpPts(B, C, resolution);
-    for (let i = 0; i <= resolution; i++) {
-        for (const pt of _lerpPts(colStarts[i], colEnds[i], resolution)) {
-            const key = _gridKey(pt.x, pt.y, pt.z, resolution);
-            if (!map.data[key]) {
-                map.data[key] = { normal: defaultNormal, point: { x: pt.x, y: pt.y, z: pt.z } };
-            }
-        }
-    }
 
     // ── Source plane (display only) ────────────────────
     if (showSourcePlane) {

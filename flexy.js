@@ -281,43 +281,39 @@ export const wrap = function({
 
     // drawPlane(THREE, castingRectangularPlane, B, scene);
 
+    // Precompute inverse world matrix once — converts world-space intersection
+    // points back into the object's local space.
+    const matrixWorldInverse = obj.matrixWorld.clone().invert();
+
     const positions = obj.geometry.attributes.position.array;
     for (let i = 0; i < positions.length; i += 3) {
-        // B1: Float32Array reads return numbers — parseFloat is unnecessary
         const x = positions[i];
         const y = positions[i + 1];
         const z = positions[i + 2];
 
-        const point = new THREE.Vector3(x, y, z);
-        const matrixWorld = obj.matrixWorld.clone();
-        point.applyMatrix4(matrixWorld.clone());
+        // Transform local vertex to world space
+        const point = new THREE.Vector3(x, y, z).applyMatrix4(obj.matrixWorld);
 
-        // Project each vertex onto the casting rectangle's plane
+        // Project each vertex perpendicularly onto the casting rectangle's plane
         const dotProduct = point.clone().sub(A).dot(castingRectangularPlane.normal);
         const projection = castingRectangularPlane.normal.clone().multiplyScalar(dotProduct / castingRectangularPlane.normal.lengthSq());
         const projectedPoint = point.clone().sub(projection);
 
-        // Look up the face normal at the projected position
+        // Look up the recorded intersection point at the projected position
         const key = hashFunction(projectedPoint.x, projectedPoint.y, projectedPoint.z, pointToFaceNormalMap.resolution);
         const coords = pointToFaceNormalMap.data[key];
-        if (!coords) throw new Error(`Cannot find face normal for posision ${x} - ${y} - ${z}`);
-        const faceNormal = new THREE.Vector3(coords.normal.x, coords.normal.y, coords.normal.z);
 
-        // Orient a dummy object toward the face normal, then apply the same rotation to the vertex
-        const dummyObject = new THREE.Object3D();
-        dummyObject.lookAt(faceNormal);
+        // If this ray missed the surface, leave the vertex unchanged
+        if (!coords) continue;
 
-        const modifiedPoint = new THREE.Vector3(x, y, z).applyQuaternion(dummyObject.quaternion.clone());
+        // Move the vertex to the world-space intersection point, then convert
+        // back to the object's local space to write into the position buffer.
+        const intersectionPoint = new THREE.Vector3(coords.point.x, coords.point.y, coords.point.z);
+        intersectionPoint.applyMatrix4(matrixWorldInverse);
 
-        positions[i] = modifiedPoint.x;
-        positions[i + 1] = modifiedPoint.y;
-        positions[i + 2] = modifiedPoint.z;
-
-        if (i % 5 === 2) {
-            // drawVector(THREE, scene, point.clone(), projectedPoint, '#f00');
-            // drawVector(THREE, scene, point.clone(), point.clone().add(faceNormal), '#ff0');
-            // drawVector(THREE, scene, point.clone(), new THREE.Vector3(coords.point.x, coords.point.y, coords.point.z), '#ff0');
-        }
+        positions[i]     = intersectionPoint.x;
+        positions[i + 1] = intersectionPoint.y;
+        positions[i + 2] = intersectionPoint.z;
     }
 
     obj.geometry.attributes.position.needsUpdate = true;
