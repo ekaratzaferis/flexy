@@ -2,17 +2,18 @@ import dns from 'dns';
 import { defineConfig } from 'vite';
 
 dns.setDefaultResultOrder('verbatim');
+
 export default defineConfig({
     server: {
-        host: 'localhost',
+        host: true,
+        allowedHosts: true,
         port: 5151
     },
     build: {
         rollupOptions: {
             input: {
-                main: './examples/base/index.html',
-                curve: './examples/curve-helper/index.html',
-                area: './examples/area-helper/index.html'
+                index: './index.html',
+                demo: './demo/index.html'
             }
         }
     }

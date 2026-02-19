@@ -1,8 +1,8 @@
 /**
  * Calculates the bounding box of a BufferGeometry.
  * @param {Library} THREE The imported THREE instance.
- * @param {BufferGeometry} bufferGeometry bufferGeometry
- * @returns The calculated bounding box
+ * @param {BufferGeometry} bufferGeometry
+ * @returns {Box3} The calculated bounding box (with an extra `.center` Vector3 property)
  */
 function calculateBoundingBox(THREE, bufferGeometry) {
     const positionAttribute = bufferGeometry.getAttribute('position');
@@ -28,21 +28,20 @@ function calculateBoundingBox(THREE, bufferGeometry) {
 }
 
 /**
- * Bends & positions the given geometry along on a CubicBezierCurve3 curve.
- * @param {Object} options The options object
+ * Bends & positions the given geometry along a CubicBezierCurve3.
+ * @param {Object} options
  * @param {Library} options.THREE The THREE instance from your app.
- * @param {CubicBezierCurve3} options.curve The curve based on which we will curve the geometry
- * @param {Quaternion} [options.quaternion] A quaternion that indicates the overall orientation of the curve
- * @param {Vector3} [options.orientation] Instead of the quaternion, directly provide the exact vector that indicates the orientation
- * @param {Vector3} [options.preserveDimensions] If set to true, it won't strech the geometry along the axis. Defaults to false.
- * @param {bufferGeometry} options.bufferGeometry The geometry that will be bent
- * @param {String} options.axis Which axis will be ajusted to the given curve
+ * @param {CubicBezierCurve3} options.curve The curve to bend the geometry along.
+ * @param {Quaternion} [options.quaternion] Overall orientation of the curve as a quaternion.
+ * @param {Vector3} [options.orientation] Alternatively, a vector perpendicular to the curve's plane.
+ * @param {boolean} [options.preserveDimensions] If true, the geometry is not stretched to fill the full curve length. Defaults to false.
+ * @param {BufferGeometry} options.bufferGeometry The geometry to bend.
+ * @param {String} options.axis Which axis to bend along ('x', 'y', or 'z').
  */
 export const bend = function({
     THREE, curve, quaternion, orientation, bufferGeometry, axis, preserveDimensions = false, scene
 }) {
 
-    // Bounding boxes of geometry //
     const geometryBB = calculateBoundingBox(THREE, bufferGeometry);
     const curveLength = preserveDimensions ? getCurveLength(curve) : 0;
     const positions = bufferGeometry.attributes.position.array;
@@ -55,10 +54,10 @@ export const bend = function({
 
         if (axis === 'x') {
 
-            // Normalize 0..1 the x coordinate relative to the geometry's length //
+            // Normalize x to 0..1 along the geometry's span
             let howFarAlongInTheGeometry = (x - geometryBB.min.x) / (geometryBB.max.x - geometryBB.min.x);
 
-            // Moves interpolation around the center of the curve and preserves the ration of curve to geometry "length"
+            // Preserve the geometry's arc-length ratio relative to the full curve
             const geometryLength = geometryBB.max.x - geometryBB.min.x;
             if (preserveDimensions && geometryLength <= curveLength) {
                 const lengthRatio = geometryLength / curveLength;
@@ -67,21 +66,21 @@ export const bend = function({
                 howFarAlongInTheGeometry = startPointOnCurve + (howFarAlongInTheGeometry * (endPointOnCurve - startPointOnCurve));
             }
 
-            // In the given curve, get the tanget line at that point //
+            // Sample position and tangent on the curve at the normalized parameter
             const tangentPoint = curve.getPointAt(howFarAlongInTheGeometry);
             const tangent = curve.getTangent(howFarAlongInTheGeometry);
 
-            // Find an orthogonal vector to the tangent normal //
+            // Compute a vector orthogonal to the tangent using the reference normal
             const referenceNormal = orientation || new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion).normalize().multiplyScalar(1000000);
             const orthogonal = referenceNormal.clone().cross(tangent.clone()).normalize();
 
-            // We calculate the rotation needed in order to rotate our tangent line in the same angle that our geometry point is rotated //
+            // Rotate the orthogonal to match the angular offset of this vertex in the YZ cross-section
             const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(tangent.clone(), Math.atan2(z, y));
 
-            // Apply the above rotation to our orthogonal //
+            // Apply the rotation
             orthogonal.applyQuaternion(rotationQuaternion);
 
-            // Set the rotated orthogonal's length equal to the length of the geometry point //
+            // Scale the rotated orthogonal to the original YZ distance of the vertex
             const displacement = orthogonal.clone().setLength(new THREE.Vector3(0, y, z).length());
 
             if (i > 0) {
@@ -91,7 +90,7 @@ export const bend = function({
                 // drawVector(THREE, scene, tangentPoint, tangentPoint.clone().add(displacement), y >= geometryBB.center.y ? '#0ff' : '#F0f');
             }
 
-            // Displace the original coordinates //
+            // Place the vertex at the curve point plus the displaced offset
             const finalPosition = tangentPoint.clone().add(displacement);
             positions[i] = finalPosition.x;
             positions[i + 1] = finalPosition.y;
@@ -99,10 +98,10 @@ export const bend = function({
 
         } else if (axis === 'z') {
 
-            // Normalize 0..1 the z coordinate relative to the geometry's length //
+            // Normalize z to 0..1 along the geometry's span
             let howFarAlongInTheGeometry = (z - geometryBB.min.z) / (geometryBB.max.z - geometryBB.min.z);
 
-            // Moves interpolation around the center of the curve and preserves the ration of curve to geometry "length"
+            // Preserve the geometry's arc-length ratio relative to the full curve
             const geometryLength = geometryBB.max.z - geometryBB.min.z;
             if (preserveDimensions && geometryLength <= curveLength) {
                 const lengthRatio = geometryLength / curveLength;
@@ -111,24 +110,24 @@ export const bend = function({
                 howFarAlongInTheGeometry = startPointOnCurve + (howFarAlongInTheGeometry * (endPointOnCurve - startPointOnCurve));
             }
 
-            // In the given curve, get the tanget line at that point //
+            // Sample position and tangent on the curve at the normalized parameter
             const tangentPoint = curve.getPointAt(howFarAlongInTheGeometry);
             const tangent = curve.getTangent(howFarAlongInTheGeometry);
 
-            // Find an orthogonal vector to the tangent normal //
+            // Compute a vector orthogonal to the tangent using the reference normal
             const referenceNormal = orientation || new THREE.Vector3(1, 0, 0).applyQuaternion(quaternion).normalize().multiplyScalar(1000000);
             const orthogonal = referenceNormal.clone().cross(tangent.clone()).normalize();
 
-            // We calculate the rotation needed in order to rotate our tangent line in the same angle that our geometry point is rotated //
+            // Rotate the orthogonal to match the angular offset of this vertex in the XY cross-section
             const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(tangent.clone(), Math.atan2(y, x) + Math.PI / 2);
 
-            // Apply the above rotation to our orthogonal //
+            // Apply the rotation
             orthogonal.applyQuaternion(rotationQuaternion);
 
-            // Set the rotated orthogonal's length equal to the length of the geometry point //
+            // Scale the rotated orthogonal to the original XY distance of the vertex
             const displacement = orthogonal.clone().setLength(new THREE.Vector3(x, y, 0).length());
 
-            // Displace the original coordinates //
+            // Place the vertex at the curve point plus the displaced offset
             const finalPosition = tangentPoint.clone().add(displacement);
             positions[i] = finalPosition.x;
             positions[i + 1] = finalPosition.y;
@@ -136,10 +135,10 @@ export const bend = function({
 
         } else if (axis === 'y') {
 
-            // Normalize 0..1 the z coordinate relative to the geometry's length //
+            // Normalize y to 0..1 along the geometry's span
             let howFarAlongInTheGeometry = (y - geometryBB.min.y) / (geometryBB.max.y - geometryBB.min.y);
 
-            // Moves interpolation around the center of the curve and preserves the ration of curve to geometry "length"
+            // Preserve the geometry's arc-length ratio relative to the full curve
             const geometryLength = geometryBB.max.y - geometryBB.min.y;
             if (preserveDimensions && geometryLength <= curveLength) {
                 const lengthRatio = geometryLength / curveLength;
@@ -148,24 +147,24 @@ export const bend = function({
                 howFarAlongInTheGeometry = startPointOnCurve + (howFarAlongInTheGeometry * (endPointOnCurve - startPointOnCurve));
             }
 
-            // In the given curve, get the tanget line at that point //
+            // Sample position and tangent on the curve at the normalized parameter
             const tangentPoint = curve.getPointAt(howFarAlongInTheGeometry);
             const tangent = curve.getTangent(howFarAlongInTheGeometry);
 
-            // Find an orthogonal vector to the tangent normal //
+            // Compute a vector orthogonal to the tangent using the reference normal
             const referenceNormal = orientation || new THREE.Vector3(1, 0, 0).applyQuaternion(quaternion).normalize().multiplyScalar(1000000);
             const orthogonal = referenceNormal.clone().cross(tangent.clone()).normalize();
 
-            // We calculate the rotation needed in order to rotate our tangent line in the same angle that our geometry point is rotated //
+            // Rotate the orthogonal to match the angular offset of this vertex in the XZ cross-section
             const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(tangent.clone(), Math.atan2(x, z));
 
-            // Apply the above rotation to our orthogonal //
+            // Apply the rotation
             orthogonal.applyQuaternion(rotationQuaternion);
 
-            // Set the rotated orthogonal's length equal to the length of the geometry point //
+            // Scale the rotated orthogonal to the original XZ distance of the vertex
             const displacement = orthogonal.clone().setLength(new THREE.Vector3(x, 0, z).length());
 
-            // Displace the original coordinates //
+            // Place the vertex at the curve point plus the displaced offset
             const finalPosition = tangentPoint.clone().add(displacement);
             positions[i] = finalPosition.x;
             positions[i + 1] = finalPosition.y;
@@ -178,19 +177,18 @@ export const bend = function({
 };
 
 /**
- * Generates a point to face normal map.
- * We're mapping each point of the casting rectangular to a face normal in the surface.
- * This happens by casting rays from the rectangular shape to the surface and remembering the collision point.
- * @param {Object} options The options object
+ * Generates a point-to-face-normal map by raycasting from a rectangular region onto a surface mesh.
+ * Each grid point on the rectangle is mapped to the face normal and intersection point on the surface.
+ * @param {Object} options
  * @param {Library} options.THREE The THREE instance from your app.
- * @param {Mesh} options.surface The surface that contains the face normals.
- * @param {Object} [options.castingRectangular] The rectangular from where the points originate.
- * @param {Vector3} [options.castingRectangular.A] A vector that indicates the top left corner
- * @param {Vector3} [options.castingRectangular.B] A vector that indicates the top right corner
- * @param {Vector3} [options.castingRectangular.C] A vector that indicates the bottom right corner
- * @param {Vector3} [options.castingRectangular.C] A vector that indicates the bottom left corner
- * @param {Vector3} [options.castingRectangular.direction] The direction that each ray should have in order to hit the surface
- * @param {Number} options.resolution How many points should we interpolate between corner A and B of the given rectangular
+ * @param {Mesh} options.surface The target mesh with face normals.
+ * @param {Object} options.castingRectangular The rectangle from which rays are cast.
+ * @param {Vector3} options.castingRectangular.A Top-left corner.
+ * @param {Vector3} options.castingRectangular.B Top-right corner.
+ * @param {Vector3} options.castingRectangular.C Bottom-right corner.
+ * @param {Vector3} options.castingRectangular.D Bottom-left corner.
+ * @param {Vector3} options.castingRectangular.direction Ray direction toward the surface.
+ * @param {Number} options.resolution Number of grid divisions along each side.
  */
 export const getPointToFaceNormalMap = function({
     THREE, surface, castingRectangular, resolution, scene
@@ -267,11 +265,18 @@ export const getPointToFaceNormalMap = function({
     };
 };
 
+/**
+ * Wraps an object's geometry onto a curved surface using a pre-built point-to-face-normal map.
+ * @param {Object} options
+ * @param {Library} options.THREE The THREE instance from your app.
+ * @param {Object} options.pointToFaceNormalMap Output from getPointToFaceNormalMap.
+ * @param {Object3D} options.obj The object whose geometry will be wrapped.
+ */
 export const wrap = function({
     THREE, pointToFaceNormalMap, obj, scene
 }) {
 
-    // Calculate the plane that's defined by the casting rectangular shape //
+    // Build the plane defined by the casting rectangle
     const rect = pointToFaceNormalMap.castingRectangular;
     const A = new THREE.Vector3(rect.A.x, rect.A.y, rect.A.z);
     const B = new THREE.Vector3(rect.B.x, rect.B.y, rect.B.z);
@@ -294,22 +299,21 @@ export const wrap = function({
         const matrixWorld = obj.matrixWorld.clone();
         point.applyMatrix4(matrixWorld.clone());
 
-        // Project each point of the obj to the casting rectangular plane //
+        // Project each vertex onto the casting rectangle's plane
         const dotProduct = point.clone().sub(A).dot(castingRectangularPlane.normal);
         const projection = castingRectangularPlane.normal.clone().multiplyScalar(dotProduct / castingRectangularPlane.normal.lengthSq());
         const projectedPoint = point.clone().sub(projection);
 
-        // Find the corresponding face normal using the hashed data map //
+        // Look up the face normal at the projected position
         const key = hashFunction(projectedPoint.x, projectedPoint.y, projectedPoint.z, pointToFaceNormalMap.resolution);
         const coords = pointToFaceNormalMap.data[key];
         if (!coords) throw new Error(`Cannot find face normal for posision ${x} - ${y} - ${z}`);
         const faceNormal = new THREE.Vector3(coords.normal.x, coords.normal.y, coords.normal.z);
 
-        // Create a dummy object and make it lookAt the face normal we just found //
+        // Orient a dummy object toward the face normal, then apply the same rotation to the vertex
         const dummyObject = new THREE.Object3D();
         dummyObject.lookAt(faceNormal);
 
-        // Apply the same rotation that it took to make the dummy object to look at the normal, to our point //
         const modifiedPoint = new THREE.Vector3(x, y, z).applyQuaternion(dummyObject.quaternion.clone());
 
         positions[i] = modifiedPoint.x;
@@ -326,6 +330,8 @@ export const wrap = function({
     obj.geometry.attributes.position.needsUpdate = true;
 
 };
+
+// ── Utilities ────────────────────────────────────────────────────────────────
 
 function hashFunction(x, y, z, resolution) {
 
@@ -359,7 +365,7 @@ function interpolatePoints(THREE, p1, p2, divisions) {
 }
 
 function getCurveLength(curve) {
-    const steps = 100; // More steps means a more accurate length
+    const steps = 100; // more steps = more accurate length estimate
     let curveLength = 0;
     let lastPoint = curve.getPointAt(0);
 
@@ -371,6 +377,8 @@ function getCurveLength(curve) {
 
     return curveLength;
 }
+
+// ── Debug helpers (kept for development use) ─────────────────────────────────
 
 function drawVector(THREE, scene, startPoint = {
     x: 0,

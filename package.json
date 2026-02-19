@@ -1,11 +1,12 @@
 {
   "name": "flexy-bend",
+  "description": "A Three.js library that bends BufferGeometry along Bezier curves.",
   "private": false,
   "version": "0.0.8",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --config vite.lib.config.js && vite build --outDir=docs --base=/flexy && cp -r examples/area-helper/vendor/ docs/examples/area-helper/vendor/",
+    "build": "vite build --config vite.lib.config.js && vite build --outDir=docs --base=/flexy",
     "preview": "vite preview"
   },
   "keywords": [
@@ -14,7 +15,8 @@
     "three",
     "threejs",
     "flex",
-    "curve"
+    "curve",
+    "bezier"
   ],
   "exports": {
     ".": {

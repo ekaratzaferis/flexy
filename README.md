@@ -1,77 +1,125 @@
-# flexy
-A library that bends three.js box geometries along Bezier Curves
+# flexy-bend
 
-# Demo
+A Three.js library that bends `BufferGeometry` along Bezier curves.
 
-[Play along with different curves and double bends!](https://ekaratzaferis.github.io/flexy/examples/base/)
+## Demo
 
-# How to install
+[Try the interactive demo →](https://ekaratzaferis.github.io/flexy/demo/)
 
-As an es6 module
+## Install
 
 ```
-npm install flexy
+npm install flexy-bend
 ```
 
-# How to use it
+## Usage
 
 ```js
-import * as flexy from 'flexy';
+import * as flexy from 'flexy-bend';
 import * as THREE from 'three';
 
 const R = 3;
-const startPoint = new Vector3(R, 0, 0);
-const controlPoint1 = new Vector3(R, R * 0.55, 0);
-const controlPoint2 = new Vector3(R * 0.45, R, 0);
-const endPoint = new Vector3(0, R, 0);
+const curve = new THREE.CubicBezierCurve3(
+    new THREE.Vector3(R, 0, 0),
+    new THREE.Vector3(R, R * 0.55, 0),
+    new THREE.Vector3(R * 0.45, R, 0),
+    new THREE.Vector3(0, R, 0)
+);
 
-// This is a cubic bezier curve. The direction that we're "drawing" the curve, affects the final outcome.
-// In this case we're drawing from x = R -> x = 0
-// So the point of our geometry with the smallest x coordinate will end up on the x = R position.
-// That will make the modified geometry appear as it was also rotated.
-const curve = new CubicBezierCurve3(startPoint, controlPoint1, controlPoint2, endPoint);
-
-// A vector that is perpendigular to the plane where most points of the curve lie upon.
-// So, if you have a curve that's on the x-y axis, then the orientation could be 0,0,1 or 0,0,-1
-// This is usefull to the modifier because it can consistently calculate the tangent lines for each point in the curve, therefore bend every point of the geometry to the correct position.
-const orientation = new new THREE.Vector3(0, 0, 1);
+// A vector perpendicular to the plane the curve lies on.
+// For a curve in the XY plane, this is the Z axis.
+const orientation = new THREE.Vector3(0, 0, 1);
 
 flexy.bend({
     THREE,
-    axis: 'x' // this is the main dimension that is compressed by the curve
     curve,
     orientation,
     bufferGeometry: mesh.geometry,
+    axis: 'x', // the axis the geometry is elongated along
 });
 ```
 
-# Behind the scenes
+## API
 
-First, we generate a mesh using the THREE.BoxGeometry constructor.
+### `bend(options)`
+
+Bends a `BufferGeometry` along a `CubicBezierCurve3`.
+
+| Option | Type | Required | Description |
+|---|---|---|---|
+| `THREE` | Library | ✓ | Your THREE.js instance |
+| `curve` | `CubicBezierCurve3` | ✓ | The curve to bend along |
+| `bufferGeometry` | `BufferGeometry` | ✓ | The geometry to deform |
+| `axis` | `'x' \| 'y' \| 'z'` | ✓ | The axis the geometry is elongated along |
+| `orientation` | `Vector3` | | A vector perpendicular to the curve's plane |
+| `quaternion` | `Quaternion` | | Alternative to `orientation` |
+| `preserveDimensions` | `boolean` | | If `true`, the geometry keeps its original arc-length instead of stretching to fill the whole curve. Defaults to `false`. |
+
+### `getPointToFaceNormalMap(options)`
+
+Raycasts a uniform grid from a rectangular region onto a mesh surface, returning a hashmap from grid points to `{ normal, point }` pairs on the surface. Used as input for `wrap()`.
+
+### `wrap(options)`
+
+Conforms a geometry to a curved surface by looking up the face normal at each vertex's projected position and rotating the vertex to align with it.
+
+---
+
+## How it works
+
+### 1. Start with a box geometry
+
 ![plot](./img/geometry.png)
 
-Then we need a curve that our geometry will be placed & streched/bent upon (in our case the X axis).
+### 2. Define a curve to bend along
+
 ![plot](./img/curve.png)
 
-First we have to normalize each x coordinate of the box, to a point at our curve. For example, the far left x coordinates, will be normalize to the point at the start of the curve.
+### 3. Normalize each vertex along the bend axis
 
-Next, we calculate the tangent for of these normalized coordinates.
+Each coordinate on the bend axis is mapped to a parameter `t ∈ [0, 1]` on the curve. The leftmost vertices map to `t = 0`, the rightmost to `t = 1`.
+
+### 4. Sample tangent lines at each parameter
+
 ![plot](./img/tangents.png)
 
-And we procceed by calculating vectors that are orthogonal/perpendicular to the tangent vectors (the purple lines).
+### 5. Compute orthogonal vectors
+
+For each tangent, compute a perpendicular vector (shown in purple) using the cross product with the reference normal.
+
 ![plot](./img/orthogonals.png)
 
-Now all we have to do, is to rotated them (counter)clockwise in order to match the (0, y, z) angle that the current x coordintate has.
+### 6. Rotate to match the original cross-section angle
+
+The orthogonal is rotated around the tangent axis by the angle `atan2(z, y)` — the angle the original vertex makes in the cross-section plane.
+
 ![plot](./img/rotation1.png)
 
-Here are the resulting normals.
+The resulting rotated vectors:
+
 ![plot](./img/rotation2.png)
 
-Finally we need to set the length of each normal, equal to the (0, y, z) length.
+### 7. Scale to the original cross-section distance
+
+Each rotated vector is scaled to match the original vertex's distance from the bend axis.
+
 ![plot](./img/final%20position.png)
 
-in order to get something like this:
+### 8. Final result
+
+The new vertex position is `curvePoint(t) + scaledOrthogonal`.
+
 ![plot](./img/bent%20geometry.png)
 
-Here's another screenshot that emphasizes the relationship between the curve and the box after the box.
+The relationship between the curve and the bent geometry:
+
 ![plot](./img/bend%20geometry%20wireframe.png)
+
+---
+
+## Development
+
+```
+npm run dev      # start dev server at localhost:5151
+npm run build    # build the library (dist/) and demo site (docs/)
+```
