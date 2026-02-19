@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flexy — Bend Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Panels ───────────────────────────────────────── */
+
+    .panel {
+      position: fixed;
+      top: 0;
+      height: 100vh;
+      background: rgba(13, 17, 23, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-color: #21262d;
+      border-style: solid;
+      overflow-y: auto;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel::-webkit-scrollbar { width: 3px; }
+    .panel::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+    #draw-panel {
+      left: 0;
+      width: 268px;
+      border-right-width: 1px;
+      padding: 18px 16px;
+      gap: 12px;
+    }
+
+    #settings-panel {
+      right: 0;
+      width: 236px;
+      border-left-width: 1px;
+      padding: 18px 16px 24px;
+    }
+
+    /* ── Panel title ──────────────────────────────────── */
+
+    .panel-title {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #484f58;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #21262d;
+      flex-shrink: 0;
+    }
+
+    /* ── Plane tabs ───────────────────────────────────── */
+
+    .tab-row {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 5px 0;
+      background: transparent;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #8b949e;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      cursor: pointer;
+      transition: all 0.14s;
+    }
+
+    .tab-btn:hover { background: #161b22; color: #e6edf3; }
+    .tab-btn.active {
+      background: rgba(0, 229, 255, 0.08);
+      border-color: rgba(0, 229, 255, 0.5);
+      color: #00e5ff;
+    }
+
+    /* ── Draw canvas ──────────────────────────────────── */
+
+    #draw-canvas {
+      display: block;
+      border-radius: 8px;
+      border: 1px solid #21262d;
+      cursor: crosshair;
+      touch-action: none;
+      flex-shrink: 0;
+    }
+
+    .canvas-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .hint {
+      font-size: 10px;
+      color: #2d333b;
+      letter-spacing: 0.04em;
+    }
+
+    #clear-btn {
+      padding: 4px 11px;
+      background: transparent;
+      border: 1px solid #30363d;
+      border-radius: 5px;
+      color: #8b949e;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.14s;
+    }
+
+    #clear-btn:hover { border-color: #8b949e; color: #e6edf3; }
+
+    /* ── Settings panel ───────────────────────────────── */
+
+    .section {
+      padding: 14px 0;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .section:last-child { border-bottom: none; }
+
+    .section-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #484f58;
+      margin-bottom: 10px;
+    }
+
+    /* ── Geometry button group ────────────────────────── */
+
+    .btn-group {
+      display: flex;
+      gap: 4px;
+    }
+
+    .geo-btn {
+      flex: 1;
+      padding: 6px 0;
+      background: transparent;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #8b949e;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.14s;
+    }
+
+    .geo-btn:hover { background: #161b22; color: #e6edf3; }
+    .geo-btn.active {
+      background: rgba(88, 166, 255, 0.1);
+      border-color: rgba(88, 166, 255, 0.55);
+      color: #58a6ff;
+    }
+
+    /* ── Sliders ──────────────────────────────────────── */
+
+    .slider-row {
+      margin-bottom: 11px;
+    }
+
+    .slider-row:last-child { margin-bottom: 0; }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 5px;
+    }
+
+    .slider-label { font-size: 12px; color: #8b949e; }
+
+    .slider-val {
+      font-size: 11px;
+      font-family: 'SF Mono', 'Consolas', 'Liberation Mono', monospace;
+      color: #58a6ff;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      background: #21262d;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #388bfd;
+      cursor: pointer;
+      transition: background 0.14s, transform 0.14s;
+    }
+
+    input[type="range"]:hover::-webkit-slider-thumb {
+      background: #58a6ff;
+      transform: scale(1.2);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      border: none;
+      background: #388bfd;
+      cursor: pointer;
+    }
+
+    /* ── Toggle switches ──────────────────────────────── */
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .toggle-row:last-child { margin-bottom: 0; }
+    .toggle-label { font-size: 12px; color: #8b949e; }
+
+    .switch {
+      position: relative;
+      width: 34px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .switch input { opacity: 0; width: 0; height: 0; }
+
+    .switch-track {
+      position: absolute;
+      inset: 0;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .switch-track::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 12px;
+      height: 12px;
+      background: #484f58;
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .switch input:checked + .switch-track {
+      background: rgba(56, 139, 253, 0.2);
+      border-color: #388bfd;
+    }
+
+    .switch input:checked + .switch-track::after {
+      transform: translateX(16px);
+      background: #388bfd;
+    }
+  </style>
+  <script type="module" crossorigin src="/flexy/assets/demo-63c6cc0f.js"></script>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- LEFT: Draw Panel                        -->
+  <!-- ═══════════════════════════════════════ -->
+  <aside class="panel" id="draw-panel">
+    <div class="panel-title">Curve</div>
+
+    <div class="tab-row">
+      <button class="tab-btn active" data-plane="xy">XY</button>
+      <button class="tab-btn" data-plane="xz">XZ</button>
+    </div>
+
+    <canvas id="draw-canvas" width="236" height="236"></canvas>
+
+    <div class="canvas-footer">
+      <span class="hint">draw left → right</span>
+      <button id="clear-btn">↺  clear</button>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- RIGHT: Settings Panel                   -->
+  <!-- ═══════════════════════════════════════ -->
+  <aside class="panel" id="settings-panel">
+    <div class="panel-title">Settings</div>
+
+    <div class="section">
+      <div class="section-label">Geometry</div>
+      <div class="btn-group">
+        <button class="geo-btn active" data-geo="box">Box</button>
+        <button class="geo-btn" data-geo="cylinder">Cylinder</button>
+        <button class="geo-btn" data-geo="plane">Plane</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Dimensions</div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-label">Width</span>
+          <span class="slider-val" id="val-width">20</span>
+        </div>
+        <input type="range" id="sl-width" min="2" max="50" value="20" step="0.5">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-label">Height</span>
+          <span class="slider-val" id="val-height">2</span>
+        </div>
+        <input type="range" id="sl-height" min="0.5" max="20" value="2" step="0.5">
+      </div>
+
+      <div class="slider-row" id="row-depth">
+        <div class="slider-header">
+          <span class="slider-label">Depth</span>
+          <span class="slider-val" id="val-depth">2</span>
+        </div>
+        <input type="range" id="sl-depth" min="0.5" max="20" value="2" step="0.5">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-label">Segments</span>
+          <span class="slider-val" id="val-segments">40</span>
+        </div>
+        <input type="range" id="sl-segments" min="2" max="120" value="40" step="1">
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Options</div>
+
+      <div class="toggle-row">
+        <span class="toggle-label">Preserve Dimensions</span>
+        <label class="switch">
+          <input type="checkbox" id="tog-preserve" checked>
+          <span class="switch-track"></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <span class="toggle-label">Wireframe</span>
+        <label class="switch">
+          <input type="checkbox" id="tog-wireframe">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+    </div>
+  </aside>
+
+  
+</body>
+</html>
