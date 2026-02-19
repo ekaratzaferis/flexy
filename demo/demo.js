@@ -423,6 +423,16 @@ function updateWrap() {
 
     flexy.wrap({ THREE, pointToFaceNormalMap: map, obj: wrapTarget });
     wrapTarget.geometry.computeVertexNormals();
+    // PlaneGeometry + rotation.x = PI/2 maps local +Z → world -Y, so computed
+    // normals point downward. Negate them so the top face is visible.
+    const normals = wrapTarget.geometry.attributes.normal.array;
+    for (let i = 0; i < normals.length; i++) normals[i] *= -1;
+    wrapTarget.geometry.attributes.normal.needsUpdate = true;
+
+    // Lift the result +3 so it sits just above the donut surface like a draped sheet.
+    // The wrap already set vertex Y values to the intersection height (or 0 for misses),
+    // so shifting the mesh up cleanly separates it from the torus for inspection.
+    wrapTarget.position.y += 3;
     wrapTarget.visible = showWrappedPlane;
 }
 

@@ -303,17 +303,19 @@ export const wrap = function({
         const key = hashFunction(projectedPoint.x, projectedPoint.y, projectedPoint.z, pointToFaceNormalMap.resolution);
         const coords = pointToFaceNormalMap.data[key];
 
-        // If this ray missed the surface, leave the vertex unchanged
-        if (!coords) continue;
+        // Vertex descends along the ray direction:
+        //   hit  → stop at the surface intersection Y
+        //   miss → reach the floor (y = 0)
+        const targetY = coords ? coords.point.y : 0;
 
-        // Move the vertex to the world-space intersection point, then convert
-        // back to the object's local space to write into the position buffer.
-        const intersectionPoint = new THREE.Vector3(coords.point.x, coords.point.y, coords.point.z);
-        intersectionPoint.applyMatrix4(matrixWorldInverse);
+        // Reconstruct the new world-space position: same XZ as the projected
+        // point, but displaced to targetY, then convert back to local space.
+        const newWorldPos = new THREE.Vector3(projectedPoint.x, targetY, projectedPoint.z);
+        newWorldPos.applyMatrix4(matrixWorldInverse);
 
-        positions[i]     = intersectionPoint.x;
-        positions[i + 1] = intersectionPoint.y;
-        positions[i + 2] = intersectionPoint.z;
+        positions[i]     = newWorldPos.x;
+        positions[i + 1] = newWorldPos.y;
+        positions[i + 2] = newWorldPos.z;
     }
 
     obj.geometry.attributes.position.needsUpdate = true;
