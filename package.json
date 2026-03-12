@@ -2,7 +2,7 @@
   "name": "flexy-bend",
   "description": "A Three.js library that bends BufferGeometry along Bezier curves",
   "private": false,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

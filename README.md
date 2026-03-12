@@ -54,6 +54,7 @@ Bends a `BufferGeometry` along a `CubicBezierCurve3`.
 | `orientation` | `Vector3` | | A vector perpendicular to the curve's plane |
 | `quaternion` | `Quaternion` | | Alternative to `orientation` |
 | `preserveDimensions` | `boolean` | | If `true`, the geometry keeps its original arc-length instead of stretching to fill the whole curve. Defaults to `false`. |
+| `orbit` | `number` | | Fractional offset along the arc from the centered position (`0.5` shifts halfway toward the end, `-0.5` toward the start). Wraps around. Only effective when `preserveDimensions` is `true`. Defaults to `0`. |
 
 ### `getPointToFaceNormalMap(options)`
 

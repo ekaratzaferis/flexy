@@ -55,6 +55,7 @@ const state = {
     depth: 2,
     segments: 40,
     preserveDimensions: true,
+    orbit: 0,
     wireframe: false,
     curvePlane: 'xy',
 };
@@ -351,6 +352,7 @@ function update() {
         bufferGeometry: geometry,
         axis: 'x',
         preserveDimensions: state.preserveDimensions,
+        orbit: state.orbit,
     });
 
     const mesh = new THREE.Mesh(geometry, mat);
@@ -489,10 +491,13 @@ bindSlider('sl-width',    'val-width',    'width',    1);
 bindSlider('sl-height',   'val-height',   'height',   1);
 bindSlider('sl-depth',    'val-depth',    'depth',    1);
 bindSlider('sl-segments', 'val-segments', 'segments', 0);
+bindSlider('sl-orbit',    'val-orbit',    'orbit',    2);
 
 // Toggles
 document.getElementById('tog-preserve').addEventListener('change', (e) => {
     state.preserveDimensions = e.target.checked;
+    document.getElementById('row-orbit').style.opacity = e.target.checked ? '' : '0.35';
+    document.getElementById('sl-orbit').disabled = !e.target.checked;
     update();
 });
 

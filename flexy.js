@@ -33,11 +33,12 @@ function calculateBoundingBox(THREE, bufferGeometry) {
  * @param {Quaternion} [options.quaternion] Overall orientation of the curve as a quaternion.
  * @param {Vector3} [options.orientation] Alternatively, a vector perpendicular to the curve's plane.
  * @param {boolean} [options.preserveDimensions] If true, the geometry is not stretched to fill the full curve length. Defaults to false.
+ * @param {number} [options.orbit] Fractional offset along the arc (0..1 = one full arc). Shifts the centered geometry along the arc. Wraps around. Only effective when `preserveDimensions` is true. Defaults to 0.
  * @param {BufferGeometry} options.bufferGeometry The geometry to bend.
  * @param {String} options.axis Which axis to bend along ('x', 'y', or 'z').
  */
 export const bend = function({
-    THREE, curve, quaternion, orientation, bufferGeometry, axis, preserveDimensions = false, scene
+    THREE, curve, quaternion, orientation, bufferGeometry, axis, preserveDimensions = false, orbit = 0, scene
 }) {
 
     const geometryBB = calculateBoundingBox(THREE, bufferGeometry);
@@ -55,7 +56,7 @@ export const bend = function({
     const axisMin = geometryBB.min[axis];
     const geometryLength = geometryBB.max[axis] - axisMin;
     const usePreserveDimensions = preserveDimensions && geometryLength <= curveLength;
-    const dimStart = usePreserveDimensions ? 0.5 - (geometryLength / curveLength) / 2 : 0;
+    const dimStart = usePreserveDimensions ? 0.5 - (geometryLength / curveLength) / 2 + orbit : 0;
     const dimScale = usePreserveDimensions ? geometryLength / curveLength : 1;
 
     for (let i = 0; i < positions.length; i += 3) {
@@ -70,6 +71,7 @@ export const bend = function({
             // Normalize x to 0..1 along the geometry's span, then remap if preserveDimensions
             let t = (x - axisMin) / geometryLength;
             if (usePreserveDimensions) t = dimStart + t * dimScale;
+            t = ((t % 1) + 1) % 1;
 
             // Sample position and tangent on the curve at the normalized parameter
             const tangentPoint = curve.getPointAt(t);
@@ -106,6 +108,7 @@ export const bend = function({
             // Normalize z to 0..1 along the geometry's span, then remap if preserveDimensions
             let t = (z - axisMin) / geometryLength;
             if (usePreserveDimensions) t = dimStart + t * dimScale;
+            t = ((t % 1) + 1) % 1;
 
             // Sample position and tangent on the curve at the normalized parameter
             const tangentPoint = curve.getPointAt(t);
@@ -134,6 +137,7 @@ export const bend = function({
             // Normalize y to 0..1 along the geometry's span, then remap if preserveDimensions
             let t = (y - axisMin) / geometryLength;
             if (usePreserveDimensions) t = dimStart + t * dimScale;
+            t = ((t % 1) + 1) % 1;
 
             // Sample position and tangent on the curve at the normalized parameter
             const tangentPoint = curve.getPointAt(t);
