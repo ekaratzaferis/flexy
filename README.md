@@ -53,8 +53,16 @@ Bends a `BufferGeometry` along a `CubicBezierCurve3`.
 | `axis` | `'x' \| 'y' \| 'z'` | ✓ | The axis the geometry is elongated along |
 | `orientation` | `Vector3` | | A vector perpendicular to the curve's plane |
 | `quaternion` | `Quaternion` | | Alternative to `orientation` |
-| `preserveDimensions` | `boolean` | | If `true`, the geometry keeps its original arc-length instead of stretching to fill the whole curve. Defaults to `false`. |
-| `orbit` | `number` | | Fractional offset along the arc from the centered position (`0.5` shifts halfway toward the end, `-0.5` toward the start). Wraps around. Only effective when `preserveDimensions` is `true`. Defaults to `0`. |
+| `mode` | `'fit' \| 'preserve' \| 'tile'` | | Controls how geometry length relates to curve length. Defaults to `'fit'`. See below. |
+| `orbit` | `number` | | Fractional shift along the curve. In `'preserve'`: shifts from center (`0.5` toward end, `-0.5` toward start). In `'tile'`: shifts the tiling start position. No effect in `'fit'`. Defaults to `0`. |
+
+#### `mode` values
+
+| Value | Behaviour |
+|---|---|
+| `'fit'` | The geometry is scaled (stretched or compressed) to exactly fill the full arc length of the curve. |
+| `'preserve'` | The geometry keeps its world-space length. It is centered on the curve and shifted by `orbit`. `t` is clamped to `[0, 1]` — the geometry never bends past the curve endpoints. |
+| `'tile'` | The geometry keeps its world-space length. When the geometry is longer than the curve, `t` wraps with modulo so the curve pattern repeats across the excess. `orbit` shifts the tiling start position. |
 
 ### `getPointToFaceNormalMap(options)`
 
@@ -63,6 +71,31 @@ Raycasts a uniform grid from a rectangular region onto a mesh surface, returning
 ### `wrap(options)`
 
 Conforms a geometry to a curved surface by looking up the face normal at each vertex's projected position and rotating the vertex to align with it.
+
+### `shear(options)`
+
+Applies a Gaussian shear deformation centered at the midpoint of the geometry. Within each cross-section, vertices are displaced along `shearAxis` in proportion to their distance from the shear-axis center, with a bell-curve falloff from the geometry's center toward its ends.
+
+| Option | Type | Required | Description |
+|---|---|---|---|
+| `THREE` | Library | ✓ | Your THREE.js instance |
+| `bufferGeometry` | `BufferGeometry` | ✓ | The geometry to deform |
+| `amplitude` | `number` | ✓ | Maximum displacement at the center cross-section |
+| `axis` | `'x' \| 'y' \| 'z'` | | The elongation axis. Defaults to `'x'` |
+| `shearAxis` | `'x' \| 'y' \| 'z'` | | The displacement axis (must differ from `axis`). Defaults to `'z'` |
+| `sigma` | `number` | | Gaussian spread in world units. Defaults to `geometryLength / 4` |
+
+### `wave(options)`
+
+Applies an arbitrary scalar displacement to a subset of vertices selected by a predicate. The displacement function receives the two coordinates in the plane perpendicular to the displacement axis.
+
+| Option | Type | Required | Description |
+|---|---|---|---|
+| `THREE` | Library | ✓ | Your THREE.js instance |
+| `bufferGeometry` | `BufferGeometry` | ✓ | The geometry to deform |
+| `predicate` | `(x, y, z) => boolean` | ✓ | Selects which vertices to affect |
+| `fn` | `(u, v) => number` | ✓ | Returns the displacement amount. For `axis='y'`: `fn(x, z)`; `axis='x'`: `fn(y, z)`; `axis='z'`: `fn(x, y)` |
+| `axis` | `'x' \| 'y' \| 'z'` | | The displacement axis. Defaults to `'y'` |
 
 ---
 

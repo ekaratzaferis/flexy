@@ -32,72 +32,74 @@ function calculateBoundingBox(THREE, bufferGeometry) {
  * @param {CubicBezierCurve3} options.curve The curve to bend the geometry along.
  * @param {Quaternion} [options.quaternion] Overall orientation of the curve as a quaternion.
  * @param {Vector3} [options.orientation] Alternatively, a vector perpendicular to the curve's plane.
- * @param {boolean} [options.preserveDimensions] If true, the geometry is not stretched to fill the full curve length. Defaults to false.
- * @param {number} [options.orbit] Fractional offset along the arc (0..1 = one full arc). Shifts the centered geometry along the arc. Wraps around. Only effective when `preserveDimensions` is true. Defaults to 0.
+ * @param {'fit'|'preserve'|'tile'} [options.mode='fit'] How geometry length relates to curve length.
+ *   - 'fit': geometry is scaled to exactly fill the curve (stretch or compress).
+ *   - 'preserve': geometry keeps its world-space length; centered on the curve via orbit.
+ *              t is clamped to [0,1] — geometry never exceeds the curve bounds.
+ *   - 'tile': geometry keeps its world-space length; t wraps with modulo so the curve
+ *              pattern repeats when the geometry is longer than the curve.
+ * @param {number} [options.orbit=0] Fractional offset along the curve.
+ *   In 'preserve': shifts from the centered position (0.5 = move to end, -0.5 = move to start).
+ *   In 'tile': shifts the starting position (0..1 = one full curve length).
+ *   Has no effect in 'fit' mode.
  * @param {BufferGeometry} options.bufferGeometry The geometry to bend.
  * @param {String} options.axis Which axis to bend along ('x', 'y', or 'z').
  */
 export const bend = function({
-    THREE, curve, quaternion, orientation, bufferGeometry, axis, preserveDimensions = false, orbit = 0, scene
+    THREE, curve, quaternion, orientation, bufferGeometry, axis, mode = 'fit', orbit = 0, scene
 }) {
 
     const geometryBB = calculateBoundingBox(THREE, bufferGeometry);
-    const curveLength = preserveDimensions ? getCurveLength(curve) : 0;
     const positions = bufferGeometry.attributes.position.array;
 
-    // A1: referenceNormal is constant across all vertices — compute once before the loop.
+    // referenceNormal is constant across all vertices — compute once before the loop.
     // x-axis bends use (0,0,1) as the default up-vector; y and z use (1,0,0).
     const defaultNormalDir = axis === 'x' ?
         new THREE.Vector3(0, 0, 1) :
         new THREE.Vector3(1, 0, 0);
     const referenceNormal = orientation || defaultNormalDir.applyQuaternion(quaternion).normalize().multiplyScalar(1000000);
 
-    // A2: preserveDimensions remapping values are pure functions of the bounding box — compute once.
     const axisMin = geometryBB.min[axis];
     const geometryLength = geometryBB.max[axis] - axisMin;
-    const usePreserveDimensions = preserveDimensions && geometryLength <= curveLength;
-    const dimStart = usePreserveDimensions ? 0.5 - (geometryLength / curveLength) / 2 + orbit : 0;
-    const dimScale = usePreserveDimensions ? geometryLength / curveLength : 1;
+
+    // curveLen is only needed for preserve/tile — skip the expensive arc-length walk for 'fit'.
+    const curveLen = (mode === 'preserve' || mode === 'tile') ? getCurveLength(curve) : 0;
+
+    // preserve: precompute the t value of the geometry's left edge so it sits centered on the curve.
+    const preserveStart = mode === 'preserve' ? 0.5 - (geometryLength / curveLen) / 2 + orbit : 0;
 
     for (let i = 0; i < positions.length; i += 3) {
 
-        // B1: positions is a Float32Array — reads already return numbers, parseFloat is a no-op
         const x = positions[i];
         const y = positions[i + 1];
         const z = positions[i + 2];
 
+        // Map the vertex's position along the elongation axis to a curve parameter t.
+        const axisVal = axis === 'x' ? x : axis === 'y' ? y : z;
+        let t;
+
+        if (mode === 'fit') {
+            // Scale geometry to exactly fill the curve — t always spans [0, 1].
+            t = (axisVal - axisMin) / geometryLength;
+        } else if (mode === 'preserve') {
+            // Geometry keeps its world-space length, centered on the curve.
+            // Clamped to [0, 1]: geometry never bends past the curve endpoints.
+            t = preserveStart + (axisVal - axisMin) / curveLen;
+            t = Math.max(0, Math.min(1, t));
+        } else {
+            // tile: geometry keeps its world-space length; the curve pattern repeats.
+            t = orbit + (axisVal - axisMin) / curveLen;
+            t = ((t % 1) + 1) % 1;
+        }
+
         if (axis === 'x') {
 
-            // Normalize x to 0..1 along the geometry's span, then remap if preserveDimensions
-            let t = (x - axisMin) / geometryLength;
-            if (usePreserveDimensions) t = dimStart + t * dimScale;
-            t = ((t % 1) + 1) % 1;
-
-            // Sample position and tangent on the curve at the normalized parameter
             const tangentPoint = curve.getPointAt(t);
             const tangent = curve.getTangent(t);
-
-            // Compute a vector orthogonal to the tangent using the reference normal
-            // B2: cross() and setFromAxisAngle() do not mutate their argument — tangent.clone() is unnecessary
             const orthogonal = referenceNormal.clone().cross(tangent).normalize();
-
-            // Rotate the orthogonal to match the angular offset of this vertex in the YZ cross-section
             const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(tangent, Math.atan2(z, y));
-
-            // Apply the rotation
             orthogonal.applyQuaternion(rotationQuaternion);
-
-            // B3: Math.hypot replaces new THREE.Vector3(0, y, z).length() — no temporary object needed
             const displacement = orthogonal.clone().setLength(Math.hypot(y, z));
-
-            if (i > 0) {
-                // drawVector(THREE, scene, tangentPoint, tangentPoint.clone().add(tangent), '#fff');
-                // drawVector(THREE, scene, tangentPoint, tangentPoint.clone().add(referenceNormal), y >= geometryBB.center.y ? '#0ff' : '#F0f');
-                // drawVector(THREE, scene, tangentPoint, tangentPoint.clone().add(orthogonal), y >= geometryBB.center.y ? '#0ff' : '#F0f');
-                // drawVector(THREE, scene, tangentPoint, tangentPoint.clone().add(displacement), y >= geometryBB.center.y ? '#0ff' : '#F0f');
-            }
-
-            // B4: getPointAt() returns a fresh Vector3 — mutate it directly instead of cloning again
             tangentPoint.add(displacement);
             positions[i] = tangentPoint.x;
             positions[i + 1] = tangentPoint.y;
@@ -105,28 +107,12 @@ export const bend = function({
 
         } else if (axis === 'z') {
 
-            // Normalize z to 0..1 along the geometry's span, then remap if preserveDimensions
-            let t = (z - axisMin) / geometryLength;
-            if (usePreserveDimensions) t = dimStart + t * dimScale;
-            t = ((t % 1) + 1) % 1;
-
-            // Sample position and tangent on the curve at the normalized parameter
             const tangentPoint = curve.getPointAt(t);
             const tangent = curve.getTangent(t);
-
-            // Compute a vector orthogonal to the tangent using the reference normal
             const orthogonal = referenceNormal.clone().cross(tangent).normalize();
-
-            // Rotate the orthogonal to match the angular offset of this vertex in the XY cross-section
             const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(tangent, Math.atan2(y, x) + Math.PI / 2);
-
-            // Apply the rotation
             orthogonal.applyQuaternion(rotationQuaternion);
-
-            // B3: Math.hypot replaces new THREE.Vector3(x, y, 0).length()
             const displacement = orthogonal.clone().setLength(Math.hypot(x, y));
-
-            // B4: mutate tangentPoint directly
             tangentPoint.add(displacement);
             positions[i] = tangentPoint.x;
             positions[i + 1] = tangentPoint.y;
@@ -134,34 +120,17 @@ export const bend = function({
 
         } else if (axis === 'y') {
 
-            // Normalize y to 0..1 along the geometry's span, then remap if preserveDimensions
-            let t = (y - axisMin) / geometryLength;
-            if (usePreserveDimensions) t = dimStart + t * dimScale;
-            t = ((t % 1) + 1) % 1;
-
-            // Sample position and tangent on the curve at the normalized parameter
             const tangentPoint = curve.getPointAt(t);
             const tangent = curve.getTangent(t);
-
-            // Compute a vector orthogonal to the tangent using the reference normal
             const orthogonal = referenceNormal.clone().cross(tangent).normalize();
-
-            // Rotate the orthogonal to match the angular offset of this vertex in the XZ cross-section
             const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(tangent, Math.atan2(x, z));
-
-            // Apply the rotation
             orthogonal.applyQuaternion(rotationQuaternion);
-
-            // B3: Math.hypot replaces new THREE.Vector3(x, 0, z).length()
             const displacement = orthogonal.clone().setLength(Math.hypot(x, z));
-
-            // B4: mutate tangentPoint directly
             tangentPoint.add(displacement);
             positions[i] = tangentPoint.x;
             positions[i + 1] = tangentPoint.y;
             positions[i + 2] = tangentPoint.z;
         }
-
     }
 
     bufferGeometry.attributes.position.needsUpdate = true;
@@ -317,13 +286,106 @@ export const wrap = function({
         const newWorldPos = new THREE.Vector3(projectedPoint.x, targetY, projectedPoint.z);
         newWorldPos.applyMatrix4(matrixWorldInverse);
 
-        positions[i]     = newWorldPos.x;
+        positions[i] = newWorldPos.x;
         positions[i + 1] = newWorldPos.y;
         positions[i + 2] = newWorldPos.z;
     }
 
     obj.geometry.attributes.position.needsUpdate = true;
 
+};
+
+/**
+ * Applies a Gaussian shear deformation to a geometry along a given elongation axis.
+ * The shear intensity follows a bell curve centered at the midpoint of the geometry.
+ * @param {Object} options
+ * @param {Library} options.THREE The THREE instance from your app.
+ * @param {BufferGeometry} options.bufferGeometry The geometry to deform.
+ * @param {String} [options.axis='x'] The elongation axis ('x'|'y'|'z').
+ * @param {String} [options.shearAxis='z'] The displacement axis ('x'|'y'|'z') — must differ from axis.
+ * @param {Number} options.amplitude Maximum displacement at the center.
+ * @param {Number} [options.sigma] Gaussian spread in world units; defaults to geometryLength / 4.
+ */
+export const shear = function({
+    THREE, bufferGeometry, axis = 'x', shearAxis = 'z', amplitude, sigma
+}) {
+    const bb = calculateBoundingBox(THREE, bufferGeometry);
+    const axisCenter = (bb.max[axis] + bb.min[axis]) / 2;
+    const halfExtent = (bb.max[shearAxis] - bb.min[shearAxis]) / 2;
+    const geometryLength = bb.max[axis] - bb.min[axis];
+    const s = sigma !== undefined ? sigma : geometryLength / 4;
+
+    const positions = bufferGeometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i];
+        const y = positions[i + 1];
+        const z = positions[i + 2];
+
+        const axisVal = axis === 'x' ? x : axis === 'y' ? y : z;
+        const shearVal = shearAxis === 'x' ? x : shearAxis === 'y' ? y : z;
+
+        const dx = axisVal - axisCenter;
+        const G = Math.exp(-(dx * dx) / (2 * s * s));
+        const displacement = halfExtent !== 0 ? amplitude * G * (shearVal / halfExtent) : 0;
+
+        if (shearAxis === 'x') {
+            positions[i] += displacement;
+        } else if (shearAxis === 'y') {
+            positions[i + 1] += displacement;
+        } else {
+            positions[i + 2] += displacement;
+        }
+    }
+
+    bufferGeometry.attributes.position.needsUpdate = true;
+};
+
+/**
+ * Applies an arbitrary scalar displacement to vertices selected by a predicate.
+ * @param {Object} options
+ * @param {Library} options.THREE The THREE instance from your app.
+ * @param {BufferGeometry} options.bufferGeometry The geometry to deform.
+ * @param {String} [options.axis='y'] The displacement axis ('x'|'y'|'z').
+ * @param {Function} options.predicate (x, y, z) => boolean — which vertices to affect.
+ * @param {Function} options.fn (u, v) => number — displacement amount.
+ *   axis='y' → fn(x, z), axis='x' → fn(y, z), axis='z' → fn(x, y)
+ */
+export const wave = function({
+    THREE, bufferGeometry, axis = 'y', predicate, fn
+}) {
+    const positions = bufferGeometry.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i];
+        const y = positions[i + 1];
+        const z = positions[i + 2];
+
+        if (!predicate(x, y, z)) continue;
+
+        let u;
+        let v;
+        if (axis === 'x') {
+            u = y;
+            v = z;
+        } else if (axis === 'y') {
+            u = x;
+            v = z;
+        } else {
+            u = x;
+            v = y;
+        }
+
+        const displacement = fn(u, v);
+
+        if (axis === 'x') {
+            positions[i] += displacement;
+        } else if (axis === 'y') {
+            positions[i + 1] += displacement;
+        } else {
+            positions[i + 2] += displacement;
+        }
+    }
+
+    bufferGeometry.attributes.position.needsUpdate = true;
 };
 
 // ── Utilities ────────────────────────────────────────────────────────────────

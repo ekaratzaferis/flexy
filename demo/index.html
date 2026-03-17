@@ -25,6 +25,7 @@
       transform: translateX(-50%);
       z-index: 20;
       display: flex;
+      align-items: center;
       gap: 4px;
       background: rgba(13, 17, 23, 0.92);
       backdrop-filter: blur(16px);
@@ -55,11 +56,28 @@
       color: #00e5ff;
     }
 
-    /* ── Show/hide by mode ────────────────────────────── */
+    .mode-sep {
+      width: 1px;
+      height: 18px;
+      background: #21262d;
+      margin: 0 4px;
+      flex-shrink: 0;
+    }
 
-    body[data-mode="wrap"] .bend-only { display: none !important; }
-    body[data-mode="bend"] .wrap-only { display: none !important; }
-    body[data-mode="wrap"] #draw-panel { display: none !important; }
+    /* Wrap button — muted / secondary styling */
+    .mode-btn--wrap {
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      color: #3d444d;
+      padding: 6px 14px;
+    }
+
+    .mode-btn--wrap:hover { color: #8b949e; }
+
+    .mode-btn--wrap.active {
+      background: rgba(139, 148, 158, 0.1);
+      color: #8b949e;
+    }
 
     /* ── Panels ───────────────────────────────────────── */
 
@@ -193,6 +211,16 @@
       margin-bottom: 10px;
     }
 
+    .sub-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      color: #30363d;
+      margin-top: 10px;
+      margin-bottom: 6px;
+    }
+
     /* ── Geometry button group ────────────────────────── */
 
     .btn-group {
@@ -278,6 +306,71 @@
       cursor: pointer;
     }
 
+    /* ── Preset curves ───────────────────────────────── */
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .preset-btn {
+      padding: 7px 4px;
+      background: transparent;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      color: #484f58;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.14s;
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .preset-btn .preset-icon {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .preset-btn:hover { border-color: #30363d; color: #8b949e; }
+
+    .preset-btn.active {
+      background: rgba(0, 229, 255, 0.08);
+      border-color: rgba(0, 229, 255, 0.4);
+      color: #00e5ff;
+    }
+
+    /* ── Face color legend ───────────────────────────── */
+
+    #face-legend {
+      margin-top: 10px;
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #484f58;
+    }
+
+    .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
     /* ── Toggle switches ──────────────────────────────── */
 
     .toggle-row {
@@ -332,14 +425,17 @@
     }
   </style>
 </head>
-<body data-mode="bend">
+<body>
 
   <!-- ═══════════════════════════════════════ -->
   <!-- MODE TOGGLE BAR (top-center)            -->
   <!-- ═══════════════════════════════════════ -->
   <div id="mode-bar">
-    <button class="mode-btn active" data-mode="bend">Bend</button>
-    <button class="mode-btn" data-mode="wrap">Wrap</button>
+    <button class="mode-btn active" data-toggle="bend">Bend</button>
+    <button class="mode-btn" data-toggle="shear">Shear</button>
+    <button class="mode-btn" data-toggle="wave">Wave</button>
+    <span class="mode-sep"></span>
+    <button class="mode-btn mode-btn--wrap" id="wrap-mode-btn">Wrap</button>
   </div>
 
   <!-- ═══════════════════════════════════════ -->
@@ -359,6 +455,22 @@
       <span class="hint">draw left → right</span>
       <button id="clear-btn">↺  clear</button>
     </div>
+
+    <div class="sub-label" style="margin-top:4px;">Presets</div>
+    <div class="preset-grid">
+      <button class="preset-btn" data-preset="halfcircle">
+        <span class="preset-icon">◠</span> Half
+      </button>
+      <button class="preset-btn" data-preset="circle">
+        <span class="preset-icon">○</span> Circle
+      </button>
+      <button class="preset-btn" data-preset="square">
+        <span class="preset-icon">□</span> Square
+      </button>
+      <button class="preset-btn" data-preset="sin">
+        <span class="preset-icon">∿</span> Sin
+      </button>
+    </div>
   </aside>
 
   <!-- ═══════════════════════════════════════ -->
@@ -367,19 +479,14 @@
   <aside class="panel" id="settings-panel">
     <div class="panel-title">Settings</div>
 
-    <!-- ── BEND: Geometry ─────────────────── -->
-    <div class="section bend-only">
+    <!-- ── Geometry ───────────────────────── -->
+    <div class="section" id="sec-geometry">
       <div class="section-label">Geometry</div>
-      <div class="btn-group">
+      <div class="btn-group" style="margin-bottom: 12px;">
         <button class="geo-btn active" data-geo="box">Box</button>
         <button class="geo-btn" data-geo="cylinder">Cylinder</button>
         <button class="geo-btn" data-geo="plane">Plane</button>
       </div>
-    </div>
-
-    <!-- ── BEND: Dimensions ───────────────── -->
-    <div class="section bend-only">
-      <div class="section-label">Dimensions</div>
 
       <div class="slider-row">
         <div class="slider-header">
@@ -414,25 +521,91 @@
       </div>
     </div>
 
-    <!-- ── BEND: Options ──────────────────── -->
-    <div class="section bend-only">
-      <div class="section-label">Options</div>
+    <!-- ── Bend options ───────────────────── -->
+    <div class="section" id="sec-bend">
+      <div class="section-label">Bend</div>
 
-      <div class="toggle-row">
-        <span class="toggle-label">Preserve Dimensions</span>
-        <label class="switch">
-          <input type="checkbox" id="tog-preserve" checked>
-          <span class="switch-track"></span>
-        </label>
+      <div class="sub-label" style="margin-top:0; margin-bottom:6px;">Mode</div>
+      <div class="btn-group">
+        <button class="geo-btn active" data-bend-mode="fit">Fit</button>
+        <button class="geo-btn" data-bend-mode="preserve">Preserve</button>
+        <button class="geo-btn" data-bend-mode="tile">Tile</button>
       </div>
 
-      <div class="slider-row" id="row-orbit">
+      <div class="slider-row" id="row-orbit" style="margin-top:12px;">
         <div class="slider-header">
           <span class="slider-label">Orbit</span>
           <span class="slider-val" id="val-orbit">0.00</span>
         </div>
         <input type="range" id="sl-orbit" min="-1" max="1" value="0" step="0.01">
       </div>
+    </div>
+
+    <!-- ── Shear ──────────────────────────── -->
+    <div class="section" id="sec-shear">
+      <div class="section-label">Shear</div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-label">Amplitude</span>
+          <span class="slider-val" id="val-shear-amp">0.50</span>
+        </div>
+        <input type="range" id="sl-shear-amp" min="-2" max="2" value="0.5" step="0.05">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-label">Sigma</span>
+          <span class="slider-val" id="val-shear-sigma">2.0</span>
+        </div>
+        <input type="range" id="sl-shear-sigma" min="0.5" max="10" value="2" step="0.1">
+      </div>
+
+      <div class="sub-label">Displace Along</div>
+      <div class="btn-group">
+        <button class="geo-btn" data-shear-axis="y">Y</button>
+        <button class="geo-btn active" data-shear-axis="z">Z</button>
+      </div>
+    </div>
+
+    <!-- ── Wave ──────────────────────────── -->
+    <div class="section" id="sec-wave">
+      <div class="section-label">Wave</div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-label">Amplitude</span>
+          <span class="slider-val" id="val-wave-amp">0.30</span>
+        </div>
+        <input type="range" id="sl-wave-amp" min="0" max="1.5" value="0.3" step="0.01">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="slider-label">Cycles</span>
+          <span class="slider-val" id="val-wave-freq">2</span>
+        </div>
+        <input type="range" id="sl-wave-freq" min="1" max="20" value="2" step="1">
+      </div>
+
+      <div class="sub-label">Oscillate Along</div>
+      <div class="btn-group" style="margin-bottom:10px;">
+        <button class="geo-btn active" data-wave-dir="x">X</button>
+        <button class="geo-btn" data-wave-dir="z">Z</button>
+      </div>
+
+      <div class="toggle-row">
+        <span class="toggle-label">Top face only</span>
+        <label class="switch">
+          <input type="checkbox" id="tog-wave-top">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- ── Render options ─────────────────── -->
+    <div class="section" id="sec-options">
+      <div class="section-label">Options</div>
 
       <div class="toggle-row">
         <span class="toggle-label">Wireframe</span>
@@ -441,10 +614,21 @@
           <span class="switch-track"></span>
         </label>
       </div>
+
+      <div id="face-legend">
+        <div class="sub-label" style="margin-top:8px; margin-bottom:6px;">Face Colors</div>
+        <div class="legend-grid">
+          <div class="legend-item"><span class="legend-swatch" style="background:#4fc3f7"></span>Top (+Y)</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#f06292"></span>Bottom (−Y)</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#81c784"></span>Front (+Z)</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#ffb74d"></span>Back (−Z)</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#a29bfe"></span>Ends (±X)</div>
+        </div>
+      </div>
     </div>
 
     <!-- ── WRAP: Torus ────────────────────── -->
-    <div class="section wrap-only">
+    <div class="section" id="sec-wrap-torus">
       <div class="section-label">Torus</div>
 
       <div class="slider-row">
@@ -465,7 +649,7 @@
     </div>
 
     <!-- ── WRAP: Plane ────────────────────── -->
-    <div class="section wrap-only">
+    <div class="section" id="sec-wrap-plane">
       <div class="section-label">Plane</div>
 
       <div class="slider-row">
@@ -494,7 +678,7 @@
     </div>
 
     <!-- ── WRAP: Options ──────────────────── -->
-    <div class="section wrap-only">
+    <div class="section" id="sec-wrap-options">
       <div class="section-label">Options</div>
 
       <div class="toggle-row">

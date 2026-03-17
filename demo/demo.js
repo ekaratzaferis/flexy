@@ -16,7 +16,6 @@ camera.position.set(0, 8, 26);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
-// Insert before panels so it sits behind them in stacking order
 document.body.insertBefore(renderer.domElement, document.body.firstChild);
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
@@ -49,15 +48,32 @@ animate();
 // ════════════════════════════════════════════════════════
 
 const state = {
+    // Geometry
     geometryType: 'box',
     width: 20,
     height: 2,
     depth: 2,
     segments: 40,
-    preserveDimensions: true,
-    orbit: 0,
     wireframe: false,
+
+    // Bend
+    bendEnabled: true,
     curvePlane: 'xy',
+    bendMode: 'fit',
+    orbit: 0,
+
+    // Shear
+    shearEnabled: false,
+    shearAmplitude: 0.5,
+    shearSigma: 2.0,
+    shearAxis: 'z',
+
+    // Wave
+    waveEnabled: false,
+    waveAmplitude: 0.3,
+    waveFrequency: 2,
+    waveTopOnly: false,
+    waveDirection: 'x',
 };
 
 const wrapState = {
@@ -70,38 +86,33 @@ const wrapState = {
     showWrappedPlane: true,
 };
 
+let wrapMode = false;
+
 // ════════════════════════════════════════════════════════
 // DRAW CANVAS
 // ════════════════════════════════════════════════════════
 
-// World units that the canvas maps to — canvas (0,0) = world (-WORLD_HALF, +WORLD_HALF)
 const WORLD_HALF = 12;
 
 const drawCanvas = document.getElementById('draw-canvas');
 const ctx = drawCanvas.getContext('2d');
-const CANVAS_SIZE = drawCanvas.width; // 236, matches HTML attribute
+const CANVAS_SIZE = drawCanvas.width;
 
 let isDrawing = false;
-let rawPoints  = [];     // [[px, py], …] canvas pixel coords while drawing
-let fittedSegs = null;   // fit-curve output [[p0,cp1,cp2,p3], …] after release
-let activeCurve = null;  // THREE curve currently being used (null = use default)
+let rawPoints  = [];
+let fittedSegs = null;
+let activeCurve = null;
 
-// ── Coordinate helpers ────────────────────────────────
-
-// Canvas pixel → 2D "bend-space" coordinates
 function canvasToBend2D(cx, cy) {
     const bx = (cx / CANVAS_SIZE - 0.5) * WORLD_HALF * 2;
-    const by = -(cy / CANVAS_SIZE - 0.5) * WORLD_HALF * 2; // flip Y (screen ↓ = world ↑)
+    const by = -(cy / CANVAS_SIZE - 0.5) * WORLD_HALF * 2;
     return [bx, by];
 }
 
-// 2D bend-space → THREE.Vector3 depending on which plane is selected
 function bend2DToVec3(bx, by) {
     if (state.curvePlane === 'xz') return new THREE.Vector3(bx, 0, by);
-    return new THREE.Vector3(bx, by, 0); // 'xy'
+    return new THREE.Vector3(bx, by, 0);
 }
-
-// ── Build THREE curve from fit-curve output ───────────
 
 function buildCurveFromFitted(segs) {
     const toVec = ([cx, cy]) => bend2DToVec3(...canvasToBend2D(cx, cy));
@@ -118,7 +129,94 @@ function buildCurveFromFitted(segs) {
     return path;
 }
 
-// ── Default curve (shown until user draws) ────────────
+// ════════════════════════════════════════════════════════
+// PRESET CURVES
+// ════════════════════════════════════════════════════════
+
+// Build a Vector3 in the active curve plane (XY or XZ).
+// x = elongation axis, y = the perpendicular axis in that plane.
+function vec(x, y) {
+    return state.curvePlane === 'xz'
+        ? new THREE.Vector3(x, 0, y)
+        : new THREE.Vector3(x, y, 0);
+}
+
+const PRESETS = {
+    halfcircle() {
+        const R = 8, k = R * 0.5523;
+        const path = new THREE.CurvePath();
+        path.add(new THREE.CubicBezierCurve3(vec(-R, 0), vec(-R, k), vec(-k, R), vec(0, R)));
+        path.add(new THREE.CubicBezierCurve3(vec(0, R), vec(k, R), vec(R, k), vec(R, 0)));
+        return path;
+    },
+    circle() {
+        // Circle centered at (0, -R) so the top sits at the origin (0, 0).
+        // Starts at the bottom (0, -2R), goes clockwise:
+        //   bottom → left → top/origin (t=0.5) → right → bottom
+        const R = 5, k = R * 0.5523;
+        const path = new THREE.CurvePath();
+        path.add(new THREE.CubicBezierCurve3(  // bottom → left
+            vec(0, -2*R), vec(-k, -2*R), vec(-R, -R-k), vec(-R, -R)
+        ));
+        path.add(new THREE.CubicBezierCurve3(  // left → top (origin)
+            vec(-R, -R), vec(-R, -R+k), vec(-k, 0), vec(0, 0)
+        ));
+        path.add(new THREE.CubicBezierCurve3(  // top (origin) → right
+            vec(0, 0), vec(k, 0), vec(R, -R+k), vec(R, -R)
+        ));
+        path.add(new THREE.CubicBezierCurve3(  // right → bottom
+            vec(R, -R), vec(R, -R-k), vec(k, -2*R), vec(0, -2*R)
+        ));
+        return path;
+    },
+    square() {
+        const S = 6;
+        const path = new THREE.CurvePath();
+        path.add(new THREE.LineCurve3(vec(-S, -S), vec(S, -S)));
+        path.add(new THREE.LineCurve3(vec(S, -S), vec(S, S)));
+        path.add(new THREE.LineCurve3(vec(S, S), vec(-S, S)));
+        path.add(new THREE.LineCurve3(vec(-S, S), vec(-S, -S)));
+        return path;
+    },
+    sin() {
+        const N = 80;
+        const points = [];
+        for (let i = 0; i <= N; i++) {
+            const x = (i / N - 0.5) * 20;   // –10 → +10
+            const y = Math.sin(i / N * Math.PI * 2) * 4;
+            points.push(vec(x, y));
+        }
+        return new THREE.CatmullRomCurve3(points);
+    },
+};
+
+let activePreset = null;
+
+function applyPreset(name) {
+    activePreset = name;
+    activeCurve  = PRESETS[name]();
+    fittedSegs   = null;
+    rawPoints    = [];
+    redrawCanvas();
+    document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.preset === name);
+    });
+    update();
+}
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (activePreset === btn.dataset.preset) {
+            // Click again to deselect → fall back to default curve
+            activePreset = null;
+            activeCurve  = null;
+            btn.classList.remove('active');
+            update();
+        } else {
+            applyPreset(btn.dataset.preset);
+        }
+    });
+});
 
 function getDefaultCurve() {
     if (state.curvePlane === 'xz') {
@@ -141,11 +239,9 @@ function getDefaultCurve() {
 
 function drawBackground() {
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
     ctx.fillStyle = '#0a0d12';
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    // Minor grid
     const step = CANVAS_SIZE / 6;
     ctx.strokeStyle = '#161b22';
     ctx.lineWidth = 1;
@@ -156,7 +252,6 @@ function drawBackground() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_SIZE, y); ctx.stroke();
     }
 
-    // Center axes
     ctx.strokeStyle = '#21262d';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(CANVAS_SIZE / 2, 0); ctx.lineTo(CANVAS_SIZE / 2, CANVAS_SIZE); ctx.stroke();
@@ -167,7 +262,6 @@ function redrawCanvas() {
     drawBackground();
 
     if (!fittedSegs) {
-        // Placeholder
         ctx.fillStyle = '#21262d';
         ctx.font = '11px system-ui';
         ctx.textAlign = 'center';
@@ -177,7 +271,6 @@ function redrawCanvas() {
         return;
     }
 
-    // Raw drawn path (faint underlay)
     if (rawPoints.length > 1) {
         ctx.strokeStyle = 'rgba(88, 166, 255, 0.16)';
         ctx.lineWidth = 1;
@@ -187,7 +280,6 @@ function redrawCanvas() {
         ctx.stroke();
     }
 
-    // Fitted bezier (glowing)
     ctx.shadowColor = 'rgba(0, 229, 255, 0.45)';
     ctx.shadowBlur = 8;
     ctx.strokeStyle = '#00e5ff';
@@ -200,7 +292,6 @@ function redrawCanvas() {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // Endpoint dots
     const start = fittedSegs[0][0];
     const end   = fittedSegs[fittedSegs.length - 1][3];
     for (const [px, py] of [start, end]) {
@@ -236,11 +327,10 @@ drawCanvas.addEventListener('mousemove', (e) => {
     const p = getCanvasPos(e);
     const last = rawPoints[rawPoints.length - 1];
     const dx = p[0] - last[0], dy = p[1] - last[1];
-    if (dx * dx + dy * dy < 25) return; // require ≥ 5 px movement
+    if (dx * dx + dy * dy < 25) return;
 
     rawPoints.push(p);
 
-    // Live preview
     drawBackground();
     ctx.strokeStyle = 'rgba(0, 229, 255, 0.55)';
     ctx.lineWidth = 1.5;
@@ -262,6 +352,9 @@ function finalizeDraw() {
 
     fittedSegs  = fitCurve(rawPoints, 8);
     activeCurve = buildCurveFromFitted(fittedSegs);
+    // Drawing clears any active preset
+    activePreset = null;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     redrawCanvas();
     update();
 }
@@ -269,7 +362,6 @@ function finalizeDraw() {
 drawCanvas.addEventListener('mouseup',    finalizeDraw);
 drawCanvas.addEventListener('mouseleave', finalizeDraw);
 
-// Clear
 document.getElementById('clear-btn').addEventListener('click', () => {
     rawPoints   = [];
     fittedSegs  = null;
@@ -278,14 +370,16 @@ document.getElementById('clear-btn').addEventListener('click', () => {
     update();
 });
 
-// Plane tabs
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         state.curvePlane = btn.dataset.plane;
-        // Remap existing drawn curve to the new plane
-        if (fittedSegs) activeCurve = buildCurveFromFitted(fittedSegs);
+        if (activePreset) {
+            activeCurve = PRESETS[activePreset]();
+        } else if (fittedSegs) {
+            activeCurve = buildCurveFromFitted(fittedSegs);
+        }
         update();
     });
 });
@@ -299,15 +393,12 @@ function buildGeometry() {
 
     switch (type) {
         case 'box':
-            return new THREE.BoxGeometry(width, height, depth, segments, 4, 4);
+            return new THREE.BoxGeometry(width, height, depth, segments, 4, segments);
 
         case 'plane':
-            // Flat sheet in XY plane; width along X (bend axis), height along Y
             return new THREE.PlaneGeometry(width, height, segments, 4);
 
         case 'cylinder': {
-            // Default cylinder is upright (height along Y).
-            // Rotate 90° around Z so height aligns with X (the bend axis).
             const geo = new THREE.CylinderGeometry(height / 2, height / 2, width, 16, segments);
             geo.applyMatrix4(new THREE.Matrix4().makeRotationZ(Math.PI / 2));
             return geo;
@@ -319,7 +410,7 @@ function buildGeometry() {
 }
 
 // ════════════════════════════════════════════════════════
-// SCENE UPDATE — BEND
+// SCENE UPDATE — MAIN (bend + shear + wave, stackable)
 // ════════════════════════════════════════════════════════
 
 let sceneObjects = [];
@@ -329,45 +420,98 @@ function clearDynamic() {
     sceneObjects = [];
 }
 
-// The orientation vector is perpendicular to the curve's plane
+// Box face material groups (THREE.BoxGeometry order):
+//   0 = +X (right end cap)   → lavender
+//   1 = -X (left end cap)    → lavender
+//   2 = +Y (top face)        → sky blue
+//   3 = -Y (bottom face)     → pink
+//   4 = +Z (front face)      → green
+//   5 = -Z (back face)       → orange
+const BOX_FACE_COLORS = [0xa29bfe, 0xa29bfe, 0x4fc3f7, 0xf06292, 0x81c784, 0xffb74d];
+
+function buildMaterial() {
+    if (state.wireframe) {
+        return new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
+    }
+    if (state.geometryType === 'box') {
+        return BOX_FACE_COLORS.map(c => new THREE.MeshBasicMaterial({ color: c }));
+    }
+    return new THREE.MeshNormalMaterial();
+}
+
 function getOrientation() {
     return state.curvePlane === 'xz'
-        ? new THREE.Vector3(0, 1, 0)   // Y ⊥ XZ plane
-        : new THREE.Vector3(0, 0, 1);  // Z ⊥ XY plane
+        ? new THREE.Vector3(0, 1, 0)
+        : new THREE.Vector3(0, 0, 1);
 }
 
 function update() {
     clearDynamic();
 
-    const curve    = activeCurve || getDefaultCurve();
     const geometry = buildGeometry();
-    const mat      = state.wireframe
-        ? new THREE.MeshNormalMaterial({ wireframe: true })
-        : new THREE.MeshNormalMaterial();
+    const mat = buildMaterial();
 
-    flexy.bend({
-        THREE,
-        curve,
-        orientation: getOrientation(),
-        bufferGeometry: geometry,
-        axis: 'x',
-        preserveDimensions: state.preserveDimensions,
-        orbit: state.orbit,
-    });
+    // Deformations applied in order: wave → shear → bend
+    // This order keeps each effect in the original-geometry coordinate space.
 
+    if (state.waveEnabled) {
+        const topThreshold = state.waveTopOnly ? state.height / 2 - 0.05 : -Infinity;
+        flexy.wave({
+            THREE,
+            bufferGeometry: geometry,
+            axis: 'y',
+            predicate: (x, y, z) => y >= topThreshold,
+            // Normalize the chosen axis to [-1, 1] relative to bar half-extent, then
+            // multiply by πN. sin(±1 * π * N) = 0 for any integer N, so both ends
+            // always have equal displacement → seam is invisible when bent into a ring.
+            fn: (x, z) => {
+                const v = state.waveDirection === 'x'
+                    ? x / (state.width / 2)
+                    : z / (state.depth / 2);
+                return Math.sin(v * Math.PI * state.waveFrequency) * state.waveAmplitude;
+            },
+        });
+    }
+
+    if (state.shearEnabled) {
+        flexy.shear({
+            THREE,
+            bufferGeometry: geometry,
+            axis: 'x',
+            shearAxis: state.shearAxis,
+            amplitude: state.shearAmplitude,
+            sigma: state.shearSigma,
+        });
+    }
+
+    if (state.bendEnabled) {
+        const curve = activeCurve || getDefaultCurve();
+
+        flexy.bend({
+            THREE,
+            curve,
+            orientation: getOrientation(),
+            bufferGeometry: geometry,
+            axis: 'x',
+            mode: state.bendMode,
+            orbit: state.orbit,
+        });
+
+        // Draw curve tube
+        const pts = curve.getPoints(200);
+        const curvePath = new THREE.CatmullRomCurve3(pts);
+        const tube = new THREE.Mesh(
+            new THREE.TubeGeometry(curvePath, 200, 0.07, 8, false),
+            new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.5 })
+        );
+        scene.add(tube);
+        sceneObjects.push(tube);
+    }
+
+    geometry.computeVertexNormals();
     const mesh = new THREE.Mesh(geometry, mat);
     scene.add(mesh);
     sceneObjects.push(mesh);
-
-    // Thin tube showing the curve path
-    const pts  = curve.getPoints(200);
-    const path = new THREE.CatmullRomCurve3(pts);
-    const tube = new THREE.Mesh(
-        new THREE.TubeGeometry(path, 200, 0.07, 8, false),
-        new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.5 })
-    );
-    scene.add(tube);
-    sceneObjects.push(tube);
 }
 
 // ════════════════════════════════════════════════════════
@@ -379,7 +523,6 @@ function updateWrap() {
 
     const { torusRadius, tubeRadius, planeW, planeH, resolution, showSourcePlane, showWrappedPlane } = wrapState;
 
-    // ── Torus ──────────────────────────────────────────
     const torusMesh = new THREE.Mesh(
         new THREE.TorusGeometry(torusRadius, tubeRadius, 32, 100),
         new THREE.MeshNormalMaterial()
@@ -389,7 +532,6 @@ function updateWrap() {
     torusMesh.updateMatrixWorld(true);
     sceneObjects.push(torusMesh);
 
-    // ── Casting rectangle (corners must match plane bounds exactly) ──
     const castingRectangular = {
         A: new THREE.Vector3(-planeW / 2, 20,  planeH / 2),
         B: new THREE.Vector3( planeW / 2, 20,  planeH / 2),
@@ -400,7 +542,6 @@ function updateWrap() {
 
     const map = flexy.getPointToFaceNormalMap({ THREE, surface: torusMesh, castingRectangular, resolution });
 
-    // ── Source plane (display only) ────────────────────
     if (showSourcePlane) {
         const srcMesh = new THREE.Mesh(
             new THREE.PlaneGeometry(planeW, planeH, resolution, resolution),
@@ -412,7 +553,6 @@ function updateWrap() {
         sceneObjects.push(srcMesh);
     }
 
-    // ── Wrap target ────────────────────────────────────
     const wrapTarget = new THREE.Mesh(
         new THREE.PlaneGeometry(planeW, planeH, resolution, resolution),
         new THREE.MeshNormalMaterial()
@@ -425,58 +565,103 @@ function updateWrap() {
 
     flexy.wrap({ THREE, pointToFaceNormalMap: map, obj: wrapTarget });
     wrapTarget.geometry.computeVertexNormals();
-    // PlaneGeometry + rotation.x = PI/2 maps local +Z → world -Y, so computed
-    // normals point downward. Negate them so the top face is visible.
     const normals = wrapTarget.geometry.attributes.normal.array;
     for (let i = 0; i < normals.length; i++) normals[i] *= -1;
     wrapTarget.geometry.attributes.normal.needsUpdate = true;
 
-    // Lift the result +3 so it sits just above the donut surface like a draped sheet.
-    // The wrap already set vertex Y values to the intersection height (or 0 for misses),
-    // so shifting the mesh up cleanly separates it from the torus for inspection.
     wrapTarget.position.y += 3;
     wrapTarget.visible = showWrappedPlane;
 }
 
 // ════════════════════════════════════════════════════════
-// MODE TOGGLE
+// SYNC UI — show/hide sections based on state
 // ════════════════════════════════════════════════════════
 
-let currentMode = 'bend';
+const drawPanel    = document.getElementById('draw-panel');
+const secGeometry  = document.getElementById('sec-geometry');
+const secBend      = document.getElementById('sec-bend');
+const secShear     = document.getElementById('sec-shear');
+const secWave      = document.getElementById('sec-wave');
+const secOptions   = document.getElementById('sec-options');
+const secWrapTorus = document.getElementById('sec-wrap-torus');
+const secWrapPlane = document.getElementById('sec-wrap-plane');
+const secWrapOpts  = document.getElementById('sec-wrap-options');
+const wrapModeBtn  = document.getElementById('wrap-mode-btn');
 
-document.querySelectorAll('.mode-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        if (btn.dataset.mode === currentMode) return;
-        currentMode = btn.dataset.mode;
-        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.body.dataset.mode = currentMode;
-        if (currentMode === 'wrap') {
-            updateWrap();
-        } else {
-            update();
-        }
+function syncUI() {
+    const mainSections = [secGeometry, secBend, secShear, secWave, secOptions];
+    const wrapSections = [secWrapTorus, secWrapPlane, secWrapOpts];
+
+    if (wrapMode) {
+        drawPanel.hidden = true;
+        mainSections.forEach(s => { s.hidden = true; });
+        wrapSections.forEach(s => { s.hidden = false; });
+        wrapModeBtn.classList.add('active');
+    } else {
+        drawPanel.hidden = !state.bendEnabled;
+        secGeometry.hidden = false;
+        secBend.hidden   = !state.bendEnabled;
+        secShear.hidden  = !state.shearEnabled;
+        secWave.hidden   = !state.waveEnabled;
+        secOptions.hidden = false;
+        wrapSections.forEach(s => { s.hidden = true; });
+        wrapModeBtn.classList.remove('active');
+    }
+
+    // Toggle button active states (only in main mode)
+    document.querySelectorAll('[data-toggle]').forEach(btn => {
+        const key = btn.dataset.toggle + 'Enabled';
+        btn.classList.toggle('active', !wrapMode && state[key]);
+        btn.disabled = wrapMode;
+        btn.style.opacity = wrapMode ? '0.3' : '';
     });
-});
+
+    // Face color legend: only meaningful for box geometry without wireframe
+    const faceLegend = document.getElementById('face-legend');
+    if (faceLegend) {
+        faceLegend.hidden = wrapMode || state.geometryType !== 'box' || state.wireframe;
+    }
+}
 
 // ════════════════════════════════════════════════════════
-// UI BINDINGS — BEND
+// MODE TOGGLE HANDLERS
 // ════════════════════════════════════════════════════════
 
-// Geometry selector
-document.querySelectorAll('.geo-btn').forEach(btn => {
+document.querySelectorAll('[data-toggle]').forEach(btn => {
     btn.addEventListener('click', () => {
-        document.querySelectorAll('.geo-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        state.geometryType = btn.dataset.geo;
-        // Depth is only meaningful for Box
-        document.getElementById('row-depth').style.display =
-            state.geometryType === 'box' ? '' : 'none';
+        const key = btn.dataset.toggle + 'Enabled';
+        state[key] = !state[key];
+        syncUI();
         update();
     });
 });
 
-// Sliders
+wrapModeBtn.addEventListener('click', () => {
+    wrapMode = !wrapMode;
+    syncUI();
+    if (wrapMode) {
+        updateWrap();
+    } else {
+        update();
+    }
+});
+
+// ════════════════════════════════════════════════════════
+// UI BINDINGS — GEOMETRY
+// ════════════════════════════════════════════════════════
+
+document.querySelectorAll('.geo-btn[data-geo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.geo-btn[data-geo]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.geometryType = btn.dataset.geo;
+        document.getElementById('row-depth').style.display =
+            state.geometryType === 'box' ? '' : 'none';
+        syncUI();
+        update();
+    });
+});
+
 function bindSlider(sliderId, valId, stateKey, decimals) {
     const slider = document.getElementById(sliderId);
     const valEl  = document.getElementById(valId);
@@ -491,19 +676,68 @@ bindSlider('sl-width',    'val-width',    'width',    1);
 bindSlider('sl-height',   'val-height',   'height',   1);
 bindSlider('sl-depth',    'val-depth',    'depth',    1);
 bindSlider('sl-segments', 'val-segments', 'segments', 0);
-bindSlider('sl-orbit',    'val-orbit',    'orbit',    2);
 
-// Toggles
-document.getElementById('tog-preserve').addEventListener('change', (e) => {
-    state.preserveDimensions = e.target.checked;
-    document.getElementById('row-orbit').style.opacity = e.target.checked ? '' : '0.35';
-    document.getElementById('sl-orbit').disabled = !e.target.checked;
-    update();
+// ════════════════════════════════════════════════════════
+// UI BINDINGS — BEND
+// ════════════════════════════════════════════════════════
+
+bindSlider('sl-orbit', 'val-orbit', 'orbit', 2);
+
+document.querySelectorAll('[data-bend-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-bend-mode]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.bendMode = btn.dataset.bendMode;
+        // orbit is meaningless in fit mode — gray it out
+        const orbitRow = document.getElementById('row-orbit');
+        const orbitSlider = document.getElementById('sl-orbit');
+        orbitRow.style.opacity  = state.bendMode === 'fit' ? '0.35' : '';
+        orbitSlider.disabled    = state.bendMode === 'fit';
+        update();
+    });
 });
 
 document.getElementById('tog-wireframe').addEventListener('change', (e) => {
     state.wireframe = e.target.checked;
+    syncUI();
     update();
+});
+
+// ════════════════════════════════════════════════════════
+// UI BINDINGS — SHEAR
+// ════════════════════════════════════════════════════════
+
+bindSlider('sl-shear-amp',   'val-shear-amp',   'shearAmplitude', 2);
+bindSlider('sl-shear-sigma', 'val-shear-sigma', 'shearSigma',     1);
+
+document.querySelectorAll('[data-shear-axis]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-shear-axis]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.shearAxis = btn.dataset.shearAxis;
+        update();
+    });
+});
+
+// ════════════════════════════════════════════════════════
+// UI BINDINGS — WAVE
+// ════════════════════════════════════════════════════════
+
+bindSlider('sl-wave-amp',  'val-wave-amp',  'waveAmplitude', 2);
+bindSlider('sl-wave-freq', 'val-wave-freq', 'waveFrequency', 0);
+
+document.getElementById('tog-wave-top').addEventListener('change', (e) => {
+    state.waveTopOnly = e.target.checked;
+    update();
+});
+
+document.querySelectorAll('[data-wave-dir]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-wave-dir]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.waveDirection = btn.dataset.waveDir;
+        update();
+    });
 });
 
 // ════════════════════════════════════════════════════════
@@ -541,4 +775,5 @@ document.getElementById('tog-wrap-plane').addEventListener('change', (e) => {
 // ════════════════════════════════════════════════════════
 
 redrawCanvas();
+syncUI();
 update();

@@ -1,78 +1,73 @@
-function S(n, r) {
-  const t = r.getAttribute("position"), s = new n.Box3();
-  s.center = new n.Vector3();
-  for (let e = 0; e < t.count; e++) {
-    const o = new n.Vector3();
-    o.fromBufferAttribute(t, e), s.expandByPoint(o), s.center.add(o);
+function Q(o, r) {
+  const t = r.getAttribute("position"), e = new o.Box3();
+  e.center = new o.Vector3();
+  for (let s = 0; s < t.count; s++) {
+    const n = new o.Vector3();
+    n.fromBufferAttribute(t, s), e.expandByPoint(n), e.center.add(n);
   }
-  return s.center.divideScalar(t.count), s;
+  return e.center.divideScalar(t.count), e;
 }
-const N = function({
-  THREE: n,
+const D = function({
+  THREE: o,
   curve: r,
   quaternion: t,
-  orientation: s,
-  bufferGeometry: e,
-  axis: o,
-  preserveDimensions: p = !1,
-  orbit: w = 0,
-  scene: f
+  orientation: e,
+  bufferGeometry: s,
+  axis: n,
+  mode: i = "fit",
+  orbit: m = 0,
+  scene: p
 }) {
-  const P = S(n, e), d = p ? D(r) : 0, i = e.attributes.position.array, m = o === "x" ? new n.Vector3(0, 0, 1) : new n.Vector3(1, 0, 0), z = s || m.applyQuaternion(t).normalize().multiplyScalar(1e6), y = P.min[o], h = P.max[o] - y, B = p && h <= d, M = B ? 0.5 - h / d / 2 + w : 0, C = B ? h / d : 1;
-  for (let a = 0; a < i.length; a += 3) {
-    const V = i[a], u = i[a + 1], g = i[a + 2];
-    if (o === "x") {
-      let c = (V - y) / h;
-      B && (c = M + c * C), c = (c % 1 + 1) % 1;
-      const l = r.getPointAt(c), x = r.getTangent(c), A = z.clone().cross(x).normalize(), Q = new n.Quaternion().setFromAxisAngle(x, Math.atan2(g, u));
-      A.applyQuaternion(Q);
-      const b = A.clone().setLength(Math.hypot(u, g));
-      l.add(b), i[a] = l.x, i[a + 1] = l.y, i[a + 2] = l.z;
-    } else if (o === "z") {
-      let c = (g - y) / h;
-      B && (c = M + c * C), c = (c % 1 + 1) % 1;
-      const l = r.getPointAt(c), x = r.getTangent(c), A = z.clone().cross(x).normalize(), Q = new n.Quaternion().setFromAxisAngle(x, Math.atan2(u, V) + Math.PI / 2);
-      A.applyQuaternion(Q);
-      const b = A.clone().setLength(Math.hypot(V, u));
-      l.add(b), i[a] = l.x, i[a + 1] = l.y, i[a + 2] = l.z;
-    } else if (o === "y") {
-      let c = (u - y) / h;
-      B && (c = M + c * C), c = (c % 1 + 1) % 1;
-      const l = r.getPointAt(c), x = r.getTangent(c), A = z.clone().cross(x).normalize(), Q = new n.Quaternion().setFromAxisAngle(x, Math.atan2(V, g));
-      A.applyQuaternion(Q);
-      const b = A.clone().setLength(Math.hypot(V, g));
-      l.add(b), i[a] = l.x, i[a + 1] = l.y, i[a + 2] = l.z;
+  const f = Q(o, s), c = s.attributes.position.array, l = n === "x" ? new o.Vector3(0, 0, 1) : new o.Vector3(1, 0, 0), a = e || l.applyQuaternion(t).normalize().multiplyScalar(1e6), x = f.min[n], u = f.max[n] - x, g = i === "preserve" || i === "tile" ? F(r) : 0, M = i === "preserve" ? 0.5 - u / g / 2 + m : 0;
+  for (let y = 0; y < c.length; y += 3) {
+    const w = c[y], V = c[y + 1], A = c[y + 2], B = n === "x" ? w : n === "y" ? V : A;
+    let z;
+    if (i === "fit" ? z = (B - x) / u : i === "preserve" ? (z = M + (B - x) / g, z = Math.max(0, Math.min(1, z))) : (z = m + (B - x) / g, z = (z % 1 + 1) % 1), n === "x") {
+      const d = r.getPointAt(z), P = r.getTangent(z), h = a.clone().cross(P).normalize(), C = new o.Quaternion().setFromAxisAngle(P, Math.atan2(A, V));
+      h.applyQuaternion(C);
+      const b = h.clone().setLength(Math.hypot(V, A));
+      d.add(b), c[y] = d.x, c[y + 1] = d.y, c[y + 2] = d.z;
+    } else if (n === "z") {
+      const d = r.getPointAt(z), P = r.getTangent(z), h = a.clone().cross(P).normalize(), C = new o.Quaternion().setFromAxisAngle(P, Math.atan2(V, w) + Math.PI / 2);
+      h.applyQuaternion(C);
+      const b = h.clone().setLength(Math.hypot(w, V));
+      d.add(b), c[y] = d.x, c[y + 1] = d.y, c[y + 2] = d.z;
+    } else if (n === "y") {
+      const d = r.getPointAt(z), P = r.getTangent(z), h = a.clone().cross(P).normalize(), C = new o.Quaternion().setFromAxisAngle(P, Math.atan2(w, A));
+      h.applyQuaternion(C);
+      const b = h.clone().setLength(Math.hypot(w, A));
+      d.add(b), c[y] = d.x, c[y + 1] = d.y, c[y + 2] = d.z;
     }
   }
-  e.attributes.position.needsUpdate = !0;
-}, W = function({
-  THREE: n,
+  s.attributes.position.needsUpdate = !0;
+}, S = function({
+  THREE: o,
   surface: r,
   castingRectangular: t,
-  resolution: s,
-  scene: e
+  resolution: e,
+  scene: s
 }) {
-  const o = {};
+  const n = {};
   t.direction.normalize();
-  const p = L(n, t.A, t.D, s), w = L(n, t.B, t.C, s);
-  for (let f = 0; f <= s; f++)
-    L(n, p[f], w[f], s).forEach((d) => {
-      const m = new n.Raycaster(d, t.direction).intersectObject(r);
-      m.length > 0 && (o[F(d.x, d.y, d.z, s)] = {
+  const i = L(o, t.A, t.D, e), m = L(o, t.B, t.C, e);
+  for (let p = 0; p <= e; p++)
+    L(o, i[p], m[p], e).forEach((c) => {
+      const a = new o.Raycaster(c, t.direction).intersectObject(r);
+      a.length > 0 && (n[v(c.x, c.y, c.z, e)] = {
         normal: {
-          x: m[0].face.normal.x,
-          y: m[0].face.normal.y,
-          z: m[0].face.normal.z
+          x: a[0].face.normal.x,
+          y: a[0].face.normal.y,
+          z: a[0].face.normal.z
         },
         point: {
-          x: m[0].point.x,
-          y: m[0].point.y,
-          z: m[0].point.z
+          x: a[0].point.x,
+          y: a[0].point.y,
+          z: a[0].point.z
         }
       });
     });
   return {
-    data: o,
+    data: n,
     castingRectangular: {
       A: {
         x: t.A.x,
@@ -100,53 +95,87 @@ const N = function({
         z: t.direction.z
       }
     },
-    resolution: s
+    resolution: e
   };
-}, $ = function({
-  THREE: n,
+}, N = function({
+  THREE: o,
   pointToFaceNormalMap: r,
   obj: t,
-  scene: s
+  scene: e
 }) {
-  const e = r.castingRectangular, o = new n.Vector3(e.A.x, e.A.y, e.A.z), p = new n.Vector3(e.B.x, e.B.y, e.B.z), w = new n.Vector3(e.C.x, e.C.y, e.C.z), f = new n.Vector3().subVectors(p, o), P = new n.Vector3().subVectors(w, o), d = new n.Vector3().crossVectors(f, P).normalize(), i = new n.Plane().setFromNormalAndCoplanarPoint(d, o), m = t.matrixWorld.clone().invert(), z = t.geometry.attributes.position.array;
-  for (let y = 0; y < z.length; y += 3) {
-    const h = z[y], B = z[y + 1], M = z[y + 2], C = new n.Vector3(h, B, M).applyMatrix4(t.matrixWorld), a = C.clone().sub(o).dot(i.normal), V = i.normal.clone().multiplyScalar(a / i.normal.lengthSq()), u = C.clone().sub(V), g = F(u.x, u.y, u.z, r.resolution), c = r.data[g], l = c ? c.point.y : 0, x = new n.Vector3(u.x, l, u.z);
-    x.applyMatrix4(m), z[y] = x.x, z[y + 1] = x.y, z[y + 2] = x.z;
+  const s = r.castingRectangular, n = new o.Vector3(s.A.x, s.A.y, s.A.z), i = new o.Vector3(s.B.x, s.B.y, s.B.z), m = new o.Vector3(s.C.x, s.C.y, s.C.z), p = new o.Vector3().subVectors(i, n), f = new o.Vector3().subVectors(m, n), c = new o.Vector3().crossVectors(p, f).normalize(), l = new o.Plane().setFromNormalAndCoplanarPoint(c, n), a = t.matrixWorld.clone().invert(), x = t.geometry.attributes.position.array;
+  for (let u = 0; u < x.length; u += 3) {
+    const g = x[u], M = x[u + 1], y = x[u + 2], w = new o.Vector3(g, M, y).applyMatrix4(t.matrixWorld), V = w.clone().sub(n).dot(l.normal), A = l.normal.clone().multiplyScalar(V / l.normal.lengthSq()), B = w.clone().sub(A), z = v(B.x, B.y, B.z, r.resolution), d = r.data[z], P = d ? d.point.y : 0, h = new o.Vector3(B.x, P, B.z);
+    h.applyMatrix4(a), x[u] = h.x, x[u + 1] = h.y, x[u + 2] = h.z;
   }
   t.geometry.attributes.position.needsUpdate = !0;
+}, U = function({
+  THREE: o,
+  bufferGeometry: r,
+  axis: t = "x",
+  shearAxis: e = "z",
+  amplitude: s,
+  sigma: n
+}) {
+  const i = Q(o, r), m = (i.max[t] + i.min[t]) / 2, p = (i.max[e] - i.min[e]) / 2, f = i.max[t] - i.min[t], c = n !== void 0 ? n : f / 4, l = r.attributes.position.array;
+  for (let a = 0; a < l.length; a += 3) {
+    const x = l[a], u = l[a + 1], g = l[a + 2], M = t === "x" ? x : t === "y" ? u : g, y = e === "x" ? x : e === "y" ? u : g, w = M - m, V = Math.exp(-(w * w) / (2 * c * c)), A = p !== 0 ? s * V * (y / p) : 0;
+    e === "x" ? l[a] += A : e === "y" ? l[a + 1] += A : l[a + 2] += A;
+  }
+  r.attributes.position.needsUpdate = !0;
+}, W = function({
+  THREE: o,
+  bufferGeometry: r,
+  axis: t = "y",
+  predicate: e,
+  fn: s
+}) {
+  const n = r.attributes.position.array;
+  for (let i = 0; i < n.length; i += 3) {
+    const m = n[i], p = n[i + 1], f = n[i + 2];
+    if (!e(m, p, f))
+      continue;
+    let c, l;
+    t === "x" ? (c = p, l = f) : t === "y" ? (c = m, l = f) : (c = m, l = p);
+    const a = s(c, l);
+    t === "x" ? n[i] += a : t === "y" ? n[i + 1] += a : n[i + 2] += a;
+  }
+  r.attributes.position.needsUpdate = !0;
 };
-function F(n, r, t, s) {
-  function e(d, i) {
-    return Math.round(d / i) * i;
+function v(o, r, t, e) {
+  function s(c, l) {
+    return Math.round(c / l) * l;
   }
-  function o(d) {
-    return d === "-0.0" ? "0.0" : d;
+  function n(c) {
+    return c === "-0.0" ? "0.0" : c;
   }
-  const p = 1 / s, w = o(e(n, p).toFixed(1)), f = o(e(r, p).toFixed(1)), P = o(e(t, p).toFixed(1));
-  return `${w}^${f}^${P}`;
+  const i = 1 / e, m = n(s(o, i).toFixed(1)), p = n(s(r, i).toFixed(1)), f = n(s(t, i).toFixed(1));
+  return `${m}^${p}^${f}`;
 }
-function L(n, r, t, s) {
-  const e = [];
-  for (let o = 0; o <= s; o++) {
-    const p = new n.Vector3(
-      r.x + (t.x - r.x) * (o / s),
-      r.y + (t.y - r.y) * (o / s),
-      r.z + (t.z - r.z) * (o / s)
+function L(o, r, t, e) {
+  const s = [];
+  for (let n = 0; n <= e; n++) {
+    const i = new o.Vector3(
+      r.x + (t.x - r.x) * (n / e),
+      r.y + (t.y - r.y) * (n / e),
+      r.z + (t.z - r.z) * (n / e)
     );
-    e.push(p);
+    s.push(i);
   }
-  return e;
+  return s;
 }
-function D(n) {
-  let t = 0, s = n.getPointAt(0);
-  for (let e = 1; e <= 100; e++) {
-    const o = n.getPointAt(e / 100);
-    t += o.distanceTo(s), s = o;
+function F(o) {
+  let t = 0, e = o.getPointAt(0);
+  for (let s = 1; s <= 100; s++) {
+    const n = o.getPointAt(s / 100);
+    t += n.distanceTo(e), e = n;
   }
   return t;
 }
 export {
-  N as bend,
-  W as getPointToFaceNormalMap,
-  $ as wrap
+  D as bend,
+  S as getPointToFaceNormalMap,
+  U as shear,
+  W as wave,
+  N as wrap
 };
